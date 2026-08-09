@@ -3,6 +3,7 @@ package com.itheima.policydailyagent.repository;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -24,7 +25,15 @@ public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, 
 
     long countByDailyTaskIdAndReviewStatus(Long dailyTaskId, String reviewStatus);
 
+    void deleteByDailyTaskId(Long dailyTaskId);
+
     List<PolicyDocument> findTop20ByStatusOrderByCreatedAtDesc(String status);
 
     List<PolicyDocument> findTop20ByStatusOrderByPublishDateDescCreatedAtDesc(String status);
+
+    List<PolicyDocument> findByPublishDateBetweenAndReviewStatusOrderByPublishDateDescCreatedAtDesc(
+            LocalDate startDate,
+            LocalDate endDate,
+            String reviewStatus
+    );
 }

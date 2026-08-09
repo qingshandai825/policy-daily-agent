@@ -1,9 +1,19 @@
 package com.itheima.policydailyagent.service;
 
+import com.itheima.policydailyagent.agent.dto.DateFilterToolInput;
+import com.itheima.policydailyagent.agent.dto.DeduplicationResult;
+import com.itheima.policydailyagent.agent.dto.DeduplicationToolInput;
+import com.itheima.policydailyagent.agent.model.AgentStage;
+import com.itheima.policydailyagent.agent.service.AgentToolExecutor;
+import com.itheima.policydailyagent.agent.tool.AgentTool;
+import com.itheima.policydailyagent.agent.tool.AgentToolCall;
+import com.itheima.policydailyagent.agent.tool.impl.PolicyCrawlerAgentTool;
+import com.itheima.policydailyagent.agent.tool.impl.PolicyDateFilterAgentTool;
+import com.itheima.policydailyagent.agent.tool.impl.PolicyDeduplicationAgentTool;
+import com.itheima.policydailyagent.agent.tool.impl.PolicySummaryAgentTool;
 import com.itheima.policydailyagent.dto.*;
 import com.itheima.policydailyagent.entity.DailyTask;
 import com.itheima.policydailyagent.entity.PolicyDocument;
-import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
 import com.itheima.policydailyagent.dto.PolicyLinkPreviewResult;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -23,36 +33,45 @@ public class PolicyDiscoveryService {
 
     private static final int DEFAULT_MAX_LINKS = 10;
 
-    private final PolicyCrawlerService policyCrawlerService;
     private final PolicyDocumentService policyDocumentService;
-    private final PolicySummaryService policySummaryService;
-    private final PolicyDocumentRepository policyDocumentRepository;
     private final DailyTaskService dailyTaskService;
-    private final PolicyDateFilterService policyDateFilterService;
+    private final AgentToolExecutor agentToolExecutor;
+    private final PolicyCrawlerAgentTool crawlerTool;
+    private final PolicyDateFilterAgentTool dateFilterTool;
+    private final PolicyDeduplicationAgentTool deduplicationTool;
+    private final PolicySummaryAgentTool summaryTool;
 
     public PolicyDiscoveryService(
-            PolicyCrawlerService policyCrawlerService,
             PolicyDocumentService policyDocumentService,
-            PolicySummaryService policySummaryService,
-            PolicyDocumentRepository policyDocumentRepository,
             DailyTaskService dailyTaskService,
-            PolicyDateFilterService policyDateFilterService
+            AgentToolExecutor agentToolExecutor,
+            PolicyCrawlerAgentTool crawlerTool,
+            PolicyDateFilterAgentTool dateFilterTool,
+            PolicyDeduplicationAgentTool deduplicationTool,
+            PolicySummaryAgentTool summaryTool
     ) {
-        this.policyCrawlerService = policyCrawlerService;
         this.policyDocumentService = policyDocumentService;
-        this.policySummaryService = policySummaryService;
-        this.policyDocumentRepository = policyDocumentRepository;
         this.dailyTaskService = dailyTaskService;
-        this.policyDateFilterService = policyDateFilterService;
+        this.agentToolExecutor = agentToolExecutor;
+        this.crawlerTool = crawlerTool;
+        this.dateFilterTool = dateFilterTool;
+        this.deduplicationTool = deduplicationTool;
+        this.summaryTool = summaryTool;
     }
 
     public PolicyDiscoverResult discoverAndSave(PolicyDiscoverRequest request) {
+        return discoverAndSave(request, null);
+    }
+
+    public PolicyDiscoverResult discoverAndSave(PolicyDiscoverRequest request, Long agentRunId) {
         if (request == null || !hasText(request.listPageUrl())) {
             throw new IllegalArgumentException("政策栏目页链接不能为空");
         }
 
-        if (request.resolvedTargetStartDate().isAfter(request.resolvedTargetEndDate())) {
-            throw new IllegalArgumentException("开始日期不能晚于结束日期" );
+        if (request.resolvedTargetStartDate() != null
+                && request.resolvedTargetEndDate() != null
+                && request.resolvedTargetStartDate().isAfter(request.resolvedTargetEndDate())) {
+            throw new IllegalArgumentException("开始日期不能晚于结束日期");
         }
 
         List<String> keywords = normalizeKeywords(request.keywords());
@@ -61,7 +80,7 @@ public class PolicyDiscoveryService {
                 : request.maxLinks();
 
         boolean autoSummarize = Boolean.TRUE.equals(request.autoSummarize());
-        DailyTask dailyTask = dailyTaskService.createAndStart(request, keywords);
+        DailyTask dailyTask = dailyTaskService.startOrReuse(request, keywords);
 
         List<CandidateLink> candidateLinks = discoverLinks(
                 request.listPageUrl(),
@@ -84,17 +103,36 @@ public class PolicyDiscoveryService {
             String url = candidateLink.url();
 
             try {
-                if (policyDocumentRepository.existsBySourceUrl(url)) {
+                DeduplicationResult urlDuplicate = executeTool(
+                        agentRunId,
+                        dailyTask.getId(),
+                        AgentStage.DEDUPLICATION,
+                        deduplicationTool,
+                        new DeduplicationToolInput(url, null)
+                );
+                if (urlDuplicate.duplicate()) {
                     duplicateCount++;
                     duplicateUrls.add(url);
                     continue;
                 }
 
-                PolicyCrawlResult crawlResult = policyCrawlerService.crawl(url);
-                DateFilterResult filterResult = policyDateFilterService.filter(
-                        crawlResult,
-                        request.resolvedTargetStartDate(),
-                        request.resolvedTargetEndDate()
+                PolicyCrawlResult crawlResult = executeTool(
+                        agentRunId,
+                        dailyTask.getId(),
+                        AgentStage.CRAWLING,
+                        crawlerTool,
+                        url
+                );
+                DateFilterResult filterResult = executeTool(
+                        agentRunId,
+                        dailyTask.getId(),
+                        AgentStage.DATE_FILTERING,
+                        dateFilterTool,
+                        new DateFilterToolInput(
+                                crawlResult,
+                                request.resolvedTargetStartDate(),
+                                request.resolvedTargetEndDate()
+                        )
                 );
 
                 if (!filterResult.accepted()) {
@@ -103,8 +141,14 @@ public class PolicyDiscoveryService {
                     continue;
                 }
 
-                if (hasText(crawlResult.contentHash())
-                        && policyDocumentRepository.existsByContentHash(crawlResult.contentHash())) {
+                DeduplicationResult contentDuplicate = executeTool(
+                        agentRunId,
+                        dailyTask.getId(),
+                        AgentStage.DEDUPLICATION,
+                        deduplicationTool,
+                        new DeduplicationToolInput(null, crawlResult.contentHash())
+                );
+                if (contentDuplicate.duplicate()) {
                     duplicateCount++;
                     duplicateUrls.add(url + " duplicate content hash");
                     continue;
@@ -137,7 +181,13 @@ public class PolicyDiscoveryService {
                 savedTitles.add(savedDocument.getTitle());
 
                 if (autoSummarize) {
-                    policySummaryService.summarizeById(savedDocument.getId());
+                    executeTool(
+                            agentRunId,
+                            dailyTask.getId(),
+                            AgentStage.SUMMARIZATION,
+                            summaryTool,
+                            savedDocument.getId()
+                    );
                     summarizedCount++;
                 }
 
@@ -169,6 +219,23 @@ public class PolicyDiscoveryService {
                 duplicateUrls,
                 filteredMessages,
                 failedMessages
+        );
+    }
+
+    private <I, O> O executeTool(
+            Long agentRunId,
+            Long taskId,
+            AgentStage stage,
+            AgentTool<I, O> tool,
+            I input
+    ) {
+        if (agentRunId == null) {
+            return tool.execute(input);
+        }
+        return agentToolExecutor.execute(
+                new AgentToolCall(agentRunId, taskId, stage),
+                tool,
+                input
         );
     }
 
@@ -229,32 +296,22 @@ public class PolicyDiscoveryService {
     }
 
     private List<String> normalizeKeywords(List<String> inputKeywords) {
-        if (inputKeywords != null && !inputKeywords.isEmpty()) {
-            return inputKeywords.stream()
-                    .filter(this::hasText)
-                    .map(String::trim)
-                    .toList();
+        if (inputKeywords == null || inputKeywords.isEmpty()) {
+            return List.of();
         }
-
-        return List.of(
-                "人工智能",
-                "智能制造",
-                "制造业",
-                "工业互联网",
-                "数据集",
-                "工业数据",
-                "大模型",
-                "智能体",
-                "算力",
-                "数字化",
-                "人工智能+制造",
-                "模数共振"
-        );
+        return inputKeywords.stream()
+                .filter(this::hasText)
+                .map(String::trim)
+                .distinct()
+                .toList();
     }
 
     private boolean matchesKeywords(String text, List<String> keywords) {
         if (!hasText(text)) {
             return false;
+        }
+        if (keywords == null || keywords.isEmpty()) {
+            return true;
         }
 
         for (String keyword : keywords) {

@@ -1,7 +1,8 @@
 package com.itheima.policydailyagent.controller;
 
+import com.itheima.policydailyagent.agent.PolicyDailyOrchestrator;
+import com.itheima.policydailyagent.agent.dto.AgentCollectionOutcome;
 import com.itheima.policydailyagent.dto.PolicyDiscoverRequest;
-import com.itheima.policydailyagent.dto.PolicyDiscoverResult;
 import com.itheima.policydailyagent.dto.PolicyLinkPreviewResult;
 import com.itheima.policydailyagent.service.PolicyDiscoveryService;
 import jakarta.validation.Valid;
@@ -15,9 +16,14 @@ import java.util.Map;
 public class PolicyDiscoveryController {
 
     private final PolicyDiscoveryService policyDiscoveryService;
+    private final PolicyDailyOrchestrator orchestrator;
 
-    public PolicyDiscoveryController(PolicyDiscoveryService policyDiscoveryService) {
+    public PolicyDiscoveryController(
+            PolicyDiscoveryService policyDiscoveryService,
+            PolicyDailyOrchestrator orchestrator
+    ) {
         this.policyDiscoveryService = policyDiscoveryService;
+        this.orchestrator = orchestrator;
     }
 
     @PostMapping("/discover-and-save")
@@ -25,8 +31,10 @@ public class PolicyDiscoveryController {
             @Valid @RequestBody PolicyDiscoverRequest request
     ) {
         try {
-            PolicyDiscoverResult result = policyDiscoveryService.discoverAndSave(request);
-            return ResponseEntity.ok(result);
+            AgentCollectionOutcome outcome = orchestrator.collectPolicies(request);
+            return ResponseEntity.ok()
+                    .header("X-Agent-Run-Id", String.valueOf(outcome.agentRunId()))
+                    .body(outcome.result());
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
         } catch (RuntimeException e) {

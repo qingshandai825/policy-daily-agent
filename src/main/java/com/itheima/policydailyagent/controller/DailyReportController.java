@@ -1,6 +1,7 @@
 package com.itheima.policydailyagent.controller;
 
-import com.itheima.policydailyagent.service.DailyReportService;
+import com.itheima.policydailyagent.agent.PolicyDailyOrchestrator;
+import com.itheima.policydailyagent.agent.exception.ReviewNotReadyException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -19,16 +20,16 @@ import java.util.Map;
 @RequestMapping("/api/daily-tasks")
 public class DailyReportController {
 
-    private final DailyReportService dailyReportService;
+    private final PolicyDailyOrchestrator orchestrator;
 
-    public DailyReportController(DailyReportService dailyReportService) {
-        this.dailyReportService = dailyReportService;
+    public DailyReportController(PolicyDailyOrchestrator orchestrator) {
+        this.orchestrator = orchestrator;
     }
 
     @PostMapping("/{taskId}/reports")
     public ResponseEntity<?> generateDailyReport(@PathVariable Long taskId) {
         try {
-            byte[] fileBytes = dailyReportService.generateDailyReport(taskId);
+            byte[] fileBytes = orchestrator.generateDailyReport(taskId);
             String fileName = "政策日报_任务" + taskId + "_"
                     + LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd"))
                     + ".docx";
@@ -40,8 +41,12 @@ public class DailyReportController {
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename*=UTF-8''" + encodedFileName)
                     .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                     .body(fileBytes);
+        } catch (ReviewNotReadyException e) {
+            return ResponseEntity.status(409).body(Map.of("message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
         }
     }
 }

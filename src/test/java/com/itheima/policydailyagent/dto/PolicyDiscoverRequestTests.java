@@ -27,7 +27,7 @@ class PolicyDiscoverRequestTests {
     }
 
     @Test
-    void shouldUseTodayWhenDateRangeIsMissing() {
+    void shouldLeaveDateRangeOpenWhenDatesAreMissing() {
         PolicyDiscoverRequest request = new PolicyDiscoverRequest(
                 "https://example.gov.cn/list",
                 List.of(),
@@ -38,7 +38,8 @@ class PolicyDiscoverRequestTests {
                 "日报任务"
         );
 
-        assertThat(request.resolvedTargetStartDate()).isEqualTo(LocalDate.now());
-        assertThat(request.resolvedTargetEndDate()).isEqualTo(LocalDate.now());
+        assertThat(request.resolvedTargetStartDate()).isNull();
+        assertThat(request.resolvedTargetEndDate()).isNull();
+        assertThat(request.hasTargetDateRange()).isFalse();
     }
 }

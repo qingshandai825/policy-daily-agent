@@ -3,7 +3,9 @@ package com.itheima.policydailyagent.controller;
 import com.itheima.policydailyagent.entity.DailyTask;
 import com.itheima.policydailyagent.service.DailyTaskService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -22,5 +24,11 @@ public class DailyTaskController {
     @GetMapping("/recent")
     public ResponseEntity<List<DailyTask>> listRecentTasks() {
         return ResponseEntity.ok(dailyTaskService.listRecentTasks());
+    }
+
+    @DeleteMapping("/{taskId}")
+    public ResponseEntity<Void> deleteTask(@PathVariable Long taskId) {
+        dailyTaskService.deleteTask(taskId);
+        return ResponseEntity.noContent().build();
     }
 }
