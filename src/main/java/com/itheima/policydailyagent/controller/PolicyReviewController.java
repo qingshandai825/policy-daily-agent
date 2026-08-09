@@ -2,6 +2,7 @@ package com.itheima.policydailyagent.controller;
 
 import com.itheima.policydailyagent.dto.PolicyReviewRequest;
 import com.itheima.policydailyagent.dto.PolicyReviewUpdateRequest;
+import com.itheima.policydailyagent.dto.PolicySelectionRequest;
 import com.itheima.policydailyagent.dto.ReviewTaskSummary;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.service.PolicyReviewService;
@@ -29,6 +30,18 @@ public class PolicyReviewController {
     @GetMapping("/tasks/{taskId}/summary")
     public ResponseEntity<ReviewTaskSummary> summarizeTask(@PathVariable Long taskId) {
         return ResponseEntity.ok(policyReviewService.summarizeTask(taskId));
+    }
+
+    @PostMapping("/tasks/{taskId}/selection")
+    public ResponseEntity<?> updateSelection(
+            @PathVariable Long taskId,
+            @RequestBody(required = false) PolicySelectionRequest request
+    ) {
+        try {
+            return ResponseEntity.ok(policyReviewService.updateSelection(taskId, request));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @PostMapping("/policies/{policyId}/approve")

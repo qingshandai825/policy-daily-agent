@@ -20,19 +20,46 @@ public record PolicyDiscoverRequest(
 
         LocalDate targetEndDate,
 
-        String taskName
+        String taskName,
+
+        Long taskId
 ) {
+    public PolicyDiscoverRequest(
+            String listPageUrl,
+            List<String> keywords,
+            Integer maxLinks,
+            Boolean autoSummarize,
+            LocalDate targetStartDate,
+            LocalDate targetEndDate,
+            String taskName
+    ) {
+        this(
+                listPageUrl,
+                keywords,
+                maxLinks,
+                autoSummarize,
+                targetStartDate,
+                targetEndDate,
+                taskName,
+                null
+        );
+    }
+
     public LocalDate resolvedTargetStartDate() {
         if (targetStartDate != null) {
             return targetStartDate;
         }
-        return targetEndDate != null ? targetEndDate : LocalDate.now();
+        return targetEndDate;
     }
 
     public LocalDate resolvedTargetEndDate() {
         if (targetEndDate != null) {
             return targetEndDate;
         }
-        return targetStartDate != null ? targetStartDate : LocalDate.now();
+        return targetStartDate;
+    }
+
+    public boolean hasTargetDateRange() {
+        return targetStartDate != null || targetEndDate != null;
     }
 }

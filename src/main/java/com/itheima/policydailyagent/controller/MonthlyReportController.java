@@ -1,7 +1,8 @@
 package com.itheima.policydailyagent.controller;
 
+import com.itheima.policydailyagent.agent.PolicyDailyOrchestrator;
+import com.itheima.policydailyagent.agent.exception.ReviewNotReadyException;
 import com.itheima.policydailyagent.dto.MonthlyReportGenerateRequest;
-import com.itheima.policydailyagent.service.MonthlyReportService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,21 +12,22 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/reports")
 public class MonthlyReportController {
 
-    private final MonthlyReportService monthlyReportService;
+    private final PolicyDailyOrchestrator policyDailyOrchestrator;
 
-    public MonthlyReportController(MonthlyReportService monthlyReportService) {
-        this.monthlyReportService = monthlyReportService;
+    public MonthlyReportController(PolicyDailyOrchestrator policyDailyOrchestrator) {
+        this.policyDailyOrchestrator = policyDailyOrchestrator;
     }
 
     @GetMapping("/monthly")
     public ResponseEntity<byte[]> downloadMonthlyReportWithDefaultParams() {
         return buildWordResponse(
-                monthlyReportService.generateMonthlyReport(null)
+                policyDailyOrchestrator.generateMonthlyReport(null)
         );
     }
 
@@ -34,8 +36,27 @@ public class MonthlyReportController {
             @RequestBody(required = false) MonthlyReportGenerateRequest request
     ) {
         return buildWordResponse(
-                monthlyReportService.generateMonthlyReport(request)
+                policyDailyOrchestrator.generateMonthlyReport(request)
         );
+    }
+
+    @PostMapping("/monthly/tasks/{taskId}")
+    public ResponseEntity<?> downloadMonthlyReportForTask(
+            @PathVariable Long taskId,
+            @RequestBody(required = false) MonthlyReportGenerateRequest request
+    ) {
+        MonthlyReportGenerateRequest scopedRequest = request == null
+                ? new MonthlyReportGenerateRequest(null, null, null, null, null, null, null, null, taskId)
+                : request.withTaskId(taskId);
+        try {
+            return buildWordResponse(policyDailyOrchestrator.generateMonthlyReport(scopedRequest));
+        } catch (ReviewNotReadyException error) {
+            return ResponseEntity.status(409).body(Map.of("message", error.getMessage()));
+        } catch (IllegalArgumentException error) {
+            return ResponseEntity.badRequest().body(Map.of("message", error.getMessage()));
+        } catch (RuntimeException error) {
+            return ResponseEntity.internalServerError().body(Map.of("message", error.getMessage()));
+        }
     }
 
     private ResponseEntity<byte[]> buildWordResponse(byte[] fileBytes) {

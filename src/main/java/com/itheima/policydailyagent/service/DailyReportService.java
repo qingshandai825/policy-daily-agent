@@ -1,5 +1,7 @@
 package com.itheima.policydailyagent.service;
 
+import com.itheima.policydailyagent.agent.dto.DailyReportSynthesis;
+
 import com.itheima.policydailyagent.entity.DailyTask;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.repository.DailyTaskRepository;
@@ -48,6 +50,11 @@ public class DailyReportService {
     }
 
     public byte[] generateDailyReport(Long taskId) {
+        return generateDailyReport(new DailyReportSynthesis(taskId, "", List.of()));
+    }
+
+    public byte[] generateDailyReport(DailyReportSynthesis synthesis) {
+        Long taskId = synthesis.taskId();
         DailyTask task = dailyTaskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Daily task not found: " + taskId));
 
@@ -71,8 +78,9 @@ public class DailyReportService {
             configurePage(document);
             configureProperties(document, task);
             writeHeader(document, task, documents.size());
-            writeKeyPoints(document, documents);
-            writePolicySections(document, documents);
+            writeAgentOverview(document, synthesis.overview());
+            writeKeyPoints(document, synthesis.keyPoints(), documents);
+            writePolicySections(document, documents, hasText(synthesis.overview()));
             writeEvidenceNotice(document);
             writeFooter(document);
 
@@ -132,26 +140,42 @@ public class DailyReportService {
         );
     }
 
-    private void writeKeyPoints(XWPFDocument document, List<PolicyDocument> documents) {
-        addSectionHeading(document, "一、本期要点");
+    private void writeAgentOverview(XWPFDocument document, String overview) {
+        if (!hasText(overview)) {
+            return;
+        }
+        addSectionHeading(document, "一、综合研判");
+        XWPFParagraph paragraph = document.createParagraph();
+        paragraph.setFirstLineIndent(560);
+        paragraph.setSpacingAfter(120);
+        setLineSpacing(paragraph, 420);
+        addRun(paragraph, overview.trim(), FONT_FANGSONG, 14, false, "222222");
+    }
 
-        for (PolicyDocument policy : documents) {
+    private void writeKeyPoints(
+            XWPFDocument document,
+            List<String> synthesizedKeyPoints,
+            List<PolicyDocument> documents
+    ) {
+        addSectionHeading(document, hasTextList(synthesizedKeyPoints) ? "二、本期要点" : "一、本期要点");
+        List<String> points = hasTextList(synthesizedKeyPoints)
+                ? synthesizedKeyPoints
+                : documents.stream().map(PolicyDocument::getTitle).toList();
+
+        for (String point : points) {
             XWPFParagraph paragraph = document.createParagraph();
             paragraph.setIndentationLeft(420);
             paragraph.setFirstLineIndent(-300);
             paragraph.setSpacingAfter(80);
             setLineSpacing(paragraph, 360);
             addRun(paragraph, "● ", FONT_FANGSONG, 14, false, "C00000");
-            addRun(paragraph, safe(policy.getTitle(), "未命名政策"), FONT_FANGSONG, 14, false, "222222");
-            if (hasText(policy.getSourceName())) {
-                addRun(paragraph, "（" + policy.getSourceName().trim() + "）", FONT_FANGSONG, 12, false, "666666");
-            }
+            addRun(paragraph, safe(point, "材料未明确"), FONT_FANGSONG, 14, false, "222222");
         }
     }
 
-    private void writePolicySections(XWPFDocument document, List<PolicyDocument> documents) {
+    private void writePolicySections(XWPFDocument document, List<PolicyDocument> documents, boolean synthesized) {
         Map<String, List<PolicyDocument>> groups = groupDocuments(documents);
-        String[] sectionNumbers = {"二", "三", "四"};
+        String[] sectionNumbers = synthesized ? new String[]{"三", "四", "五"} : new String[]{"二", "三", "四"};
         int sectionIndex = 0;
 
         for (Map.Entry<String, List<PolicyDocument>> entry : groups.entrySet()) {
@@ -330,6 +354,9 @@ public class DailyReportService {
     }
 
     private boolean isWithinTaskDateRange(PolicyDocument policy, DailyTask task) {
+        if (task.getTargetStartDate() == null && task.getTargetEndDate() == null) {
+            return true;
+        }
         if (policy.getPublishDate() == null) {
             return false;
         }
@@ -353,6 +380,9 @@ public class DailyReportService {
     }
 
     private String formatDateRange(DailyTask task) {
+        if (task.getTargetStartDate() == null && task.getTargetEndDate() == null) {
+            return "当前栏目页（未限制发布日期）";
+        }
         LocalDate start = resolvedTaskStartDate(task);
         LocalDate end = resolvedTaskEndDate(task);
         if (start.equals(end)) {
@@ -417,6 +447,10 @@ public class DailyReportService {
 
     private String safe(String value, String fallback) {
         return value == null || value.isBlank() ? fallback : value.trim();
+    }
+
+    private boolean hasTextList(List<String> values) {
+        return values != null && values.stream().anyMatch(this::hasText);
     }
 
     private boolean hasText(String value) {

@@ -7,9 +7,13 @@
 - 从配置的政府固定信源采集候选政策
 - 按政策实际发布日期过滤内容
 - 保存来源 URL、正文和结构化信息
-- 提供人工审核界面，支持通过、驳回和内容修订
-- 仅使用审核通过的政策生成 Word 日报
+- 提供可复用政策素材工作区，支持追加采集、删除任务和链接勾选
+- Agent 基于当前工作区人工勾选的多条政策生成结构化月报内容，Word Tool 负责填充原始模板并保留固定版式
 - 使用 Nginx 提供独立前端并反向代理 Spring Boot API
+
+## Agent 架构
+
+项目通过持久化 Orchestrator、类型化 Tool Calling、任务级 Memory/State 和统一失败重试驱动采集到报告生成流程。架构与接口说明见 [Agent Architecture](docs/agent-architecture.md)。
 
 ## 技术栈
 

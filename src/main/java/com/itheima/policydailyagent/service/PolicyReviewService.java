@@ -2,6 +2,7 @@ package com.itheima.policydailyagent.service;
 
 import com.itheima.policydailyagent.dto.PolicyReviewRequest;
 import com.itheima.policydailyagent.dto.PolicyReviewUpdateRequest;
+import com.itheima.policydailyagent.dto.PolicySelectionRequest;
 import com.itheima.policydailyagent.dto.ReviewTaskSummary;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
@@ -9,7 +10,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 @Service
 public class PolicyReviewService {
@@ -40,6 +43,34 @@ public class PolicyReviewService {
                 policyDocumentRepository.countByDailyTaskIdAndReviewStatus(taskId, REJECTED),
                 policyDocumentRepository.countByDailyTaskIdAndReviewStatus(taskId, NEEDS_EDIT)
         );
+    }
+
+    @Transactional
+    public ReviewTaskSummary updateSelection(Long taskId, PolicySelectionRequest request) {
+        List<PolicyDocument> documents = listPoliciesForTask(taskId);
+        Set<Long> selectedIds = new HashSet<>(
+                request == null ? List.of() : request.policyIds()
+        );
+        Set<Long> taskPolicyIds = documents.stream()
+                .map(PolicyDocument::getId)
+                .collect(java.util.stream.Collectors.toSet());
+        if (!taskPolicyIds.containsAll(selectedIds)) {
+            throw new IllegalArgumentException("选择中包含不属于当前任务的政策");
+        }
+
+        String reviewer = request == null ? "" : safe(request.reviewedBy());
+        LocalDateTime reviewedAt = LocalDateTime.now();
+        for (PolicyDocument document : documents) {
+            boolean selected = selectedIds.contains(document.getId());
+            document.setReviewStatus(selected ? APPROVED : PENDING_REVIEW);
+            document.setReviewedBy(selected ? reviewer : "");
+            document.setReviewedAt(selected ? reviewedAt : null);
+            if (!selected) {
+                document.setReviewComment("");
+            }
+        }
+        policyDocumentRepository.saveAll(documents);
+        return summarizeTask(taskId);
     }
 
     @Transactional

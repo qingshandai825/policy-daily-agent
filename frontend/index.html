@@ -3,44 +3,43 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>政策日报审核台</title>
+  <title>政策素材工作台</title>
   <style>
     :root {
       color-scheme: light;
-      --bg: #f6f8fb;
+      --bg: #f4f6f8;
       --surface: #ffffff;
-      --line: #d9e1ea;
-      --text: #172033;
-      --muted: #637083;
-      --brand: #0b6bcb;
-      --brand-dark: #084f96;
-      --ok: #147a4b;
-      --bad: #b42318;
-      --warn: #9a5b00;
-      --soft: #eef4fb;
+      --surface-soft: #f8fafc;
+      --line: #d8dee7;
+      --text: #182230;
+      --muted: #667085;
+      --brand: #1769aa;
+      --brand-dark: #10558d;
+      --selected: #eaf3fb;
+      --ok: #16794d;
+      --danger: #b42318;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
+      min-width: 320px;
       background: var(--bg);
       color: var(--text);
-      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
-      font-size: 14px;
+      font: 14px/1.5 "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
     }
 
     header {
-      height: 56px;
+      height: 58px;
+      padding: 0 20px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
-      background: #172033;
+      gap: 16px;
       color: #fff;
-      border-bottom: 1px solid #0f1726;
+      background: #182230;
+      border-bottom: 1px solid #101828;
     }
 
     header h1 {
@@ -51,443 +50,360 @@
 
     main {
       display: grid;
-      grid-template-columns: 340px minmax(420px, 1fr) 430px;
+      grid-template-columns: 350px minmax(0, 1fr);
       gap: 12px;
+      height: calc(100vh - 58px);
+      min-height: 650px;
       padding: 12px;
-      height: calc(100vh - 56px);
-      min-height: 680px;
     }
 
     section {
       min-width: 0;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 6px;
       display: flex;
       flex-direction: column;
       overflow: hidden;
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
     }
 
     .section-head {
-      min-height: 48px;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
+      min-height: 50px;
+      padding: 9px 12px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 8px;
-      background: #fbfcfe;
+      gap: 10px;
+      background: var(--surface-soft);
+      border-bottom: 1px solid var(--line);
     }
 
     .section-head h2 {
       margin: 0;
+      min-width: 0;
       font-size: 15px;
       font-weight: 650;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .content {
+      min-height: 0;
       padding: 12px;
       overflow: auto;
     }
 
-    .stack {
-      display: grid;
-      gap: 10px;
-    }
+    .stack { display: grid; gap: 10px; }
+    .row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 
-    label {
+    label.field {
       display: grid;
       gap: 4px;
       color: var(--muted);
       font-size: 12px;
     }
 
-    input,
-    textarea,
-    select {
-      width: 100%;
-      border: 1px solid var(--line);
+    input, select, button {
+      min-height: 34px;
       border-radius: 4px;
-      padding: 8px 9px;
-      color: var(--text);
-      background: #fff;
       font: inherit;
     }
 
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-      line-height: 1.5;
+    input, select {
+      width: 100%;
+      padding: 7px 9px;
+      color: var(--text);
+      background: #fff;
+      border: 1px solid var(--line);
     }
 
     button {
-      border: 1px solid transparent;
-      border-radius: 4px;
-      padding: 8px 11px;
-      font: inherit;
+      padding: 7px 11px;
       font-weight: 600;
-      cursor: pointer;
-      background: var(--soft);
       color: var(--text);
+      background: #eef2f6;
+      border: 1px solid transparent;
+      cursor: pointer;
     }
 
-    button:hover {
-      border-color: #b8c8da;
+    button:hover { border-color: #aebccc; }
+    button:disabled { opacity: .48; cursor: not-allowed; }
+    button.primary { color: #fff; background: var(--brand); }
+    button.primary:hover { background: var(--brand-dark); }
+    button.danger { color: var(--danger); background: #fff1f0; border-color: #ffd0cc; }
+
+    .status {
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
     }
 
-    button.primary {
-      background: var(--brand);
-      color: #fff;
+    .workspace-list {
+      display: grid;
+      gap: 7px;
+      padding-top: 2px;
+      border-top: 1px solid var(--line);
     }
 
-    button.primary:hover {
-      background: var(--brand-dark);
-    }
-
-    button.danger {
-      background: #fff2f0;
-      color: var(--bad);
-      border-color: #ffd0cc;
-    }
-
-    button.success {
-      background: #eaf7f0;
-      color: var(--ok);
-      border-color: #bfe6d1;
-    }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .task,
-    .policy {
+    .workspace {
+      padding: 9px 10px;
       border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px;
+      border-radius: 5px;
       background: #fff;
       cursor: pointer;
     }
 
-    .task.active,
-    .policy.active {
-      border-color: var(--brand);
-      background: #f2f7fd;
-    }
+    .workspace:hover { border-color: #aebccc; }
+    .workspace.active { border-color: var(--brand); background: var(--selected); }
+    .workspace-title { font-weight: 650; overflow-wrap: anywhere; }
+    .workspace-meta { margin-top: 4px; color: var(--muted); font-size: 12px; }
 
-    .title {
-      font-weight: 650;
-      line-height: 1.4;
-      overflow-wrap: anywhere;
-    }
-
-    .meta {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-      overflow-wrap: anywhere;
-    }
-
-    .badges {
+    .review-toolbar {
+      padding: 10px 12px;
       display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-
-    .badge {
-      display: inline-flex;
       align-items: center;
-      border-radius: 999px;
-      padding: 3px 8px;
-      font-size: 12px;
-      background: #eef2f7;
-      color: #465365;
-      border: 1px solid #dce3ec;
-    }
-
-    .badge.approved {
-      background: #eaf7f0;
-      color: var(--ok);
-      border-color: #bfe6d1;
-    }
-
-    .badge.rejected {
-      background: #fff2f0;
-      color: var(--bad);
-      border-color: #ffd0cc;
-    }
-
-    .badge.pending {
-      background: #fff8e8;
-      color: var(--warn);
-      border-color: #f0d79b;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(64px, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .metric {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px;
-      background: #fbfcfe;
-    }
-
-    .metric strong {
-      display: block;
-      font-size: 18px;
-    }
-
-    .metric span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .empty {
-      padding: 18px;
-      color: var(--muted);
-      text-align: center;
-      border: 1px dashed var(--line);
-      border-radius: 6px;
-      background: #fbfcfe;
-    }
-
-    .details {
-      display: grid;
+      justify-content: space-between;
       gap: 10px;
+      border-bottom: 1px solid var(--line);
     }
 
-    .evidence {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px;
-      background: #fbfcfe;
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre-wrap;
-      line-height: 1.55;
-    }
+    .selection-count { font-weight: 650; color: var(--ok); }
 
-    .toolbar {
+    .agent-strip {
+      padding: 8px 12px;
       display: flex;
-      gap: 8px;
       align-items: center;
-      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--muted);
+      background: #fbfcfd;
+      border-bottom: 1px solid var(--line);
+      font-size: 12px;
     }
 
-    a {
-      color: var(--brand);
+    .policy-list { display: grid; }
+
+    .policy-row {
+      display: grid;
+      grid-template-columns: 24px minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: start;
+      padding: 13px 12px;
+      border-bottom: 1px solid #e8ecf1;
+    }
+
+    .policy-row.selected { background: #f3f8fc; }
+    .policy-row input[type="checkbox"] { width: 17px; height: 17px; margin: 3px 0 0; accent-color: var(--brand); }
+
+    .policy-title {
+      display: inline;
+      color: #164f7d;
+      font-size: 15px;
+      font-weight: 650;
       text-decoration: none;
       overflow-wrap: anywhere;
     }
 
-    a:hover {
-      text-decoration: underline;
+    .policy-title:hover { text-decoration: underline; }
+    .policy-meta { margin-top: 4px; color: var(--muted); font-size: 12px; }
+
+    .policy-excerpt {
+      margin: 7px 0 0;
+      color: #475467;
+      line-height: 1.6;
+      display: -webkit-box;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
+      overflow: hidden;
     }
 
-    .status-line {
-      color: var(--muted);
+    .open-link {
+      color: var(--brand);
+      text-decoration: none;
+      white-space: nowrap;
       font-size: 12px;
     }
 
-    @media (max-width: 1120px) {
-      main {
-        grid-template-columns: 310px 1fr;
-        height: auto;
-      }
+    .open-link:hover { text-decoration: underline; }
 
-      section.details-panel {
-        grid-column: 1 / -1;
-        min-height: 520px;
-      }
+    .empty {
+      margin: 18px;
+      padding: 24px;
+      color: var(--muted);
+      text-align: center;
+      background: var(--surface-soft);
+      border: 1px dashed var(--line);
+      border-radius: 5px;
     }
 
-    @media (max-width: 760px) {
-      main {
-        grid-template-columns: 1fr;
-        padding: 8px;
-      }
+    dialog {
+      width: min(620px, calc(100vw - 24px));
+      max-height: calc(100vh - 32px);
+      padding: 0;
+      color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      box-shadow: 0 18px 48px rgba(16, 24, 40, .2);
+    }
 
-      header {
-        padding: 0 12px;
-      }
+    dialog::backdrop { background: rgba(16, 24, 40, .46); }
+    .dialog-head { padding: 14px 16px; border-bottom: 1px solid var(--line); }
+    .dialog-head h2 { margin: 0; font-size: 16px; }
+    .dialog-body { padding: 16px; display: grid; gap: 12px; }
+    .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .dialog-actions {
+      padding: 12px 16px;
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      background: var(--surface-soft);
+      border-top: 1px solid var(--line);
+    }
+
+    @media (max-width: 860px) {
+      main { grid-template-columns: 1fr; height: auto; }
+      section { min-height: 500px; }
+      header { padding: 0 12px; }
+    }
+
+    @media (max-width: 560px) {
+      .policy-row { grid-template-columns: 24px minmax(0, 1fr); }
+      .open-link { grid-column: 2; }
+      .review-toolbar { align-items: flex-start; flex-direction: column; }
+      .form-grid { grid-template-columns: 1fr; }
     }
   </style>
 </head>
 <body>
 <header>
-  <h1>政策日报审核台</h1>
+  <h1>政策素材工作台</h1>
   <div class="toolbar">
-    <button id="refreshTasksBtn">刷新任务</button>
-    <button id="generateBtn" class="primary" disabled>生成日报</button>
+    <span id="globalStatus" class="status"></span>
+    <button id="generateBtn" class="primary" disabled>按模板生成月报</button>
   </div>
 </header>
 
 <main>
   <section>
     <div class="section-head">
-      <h2>任务</h2>
-      <span id="taskStatus" class="status-line"></span>
+      <h2>采集工作区</h2>
+      <div class="toolbar">
+        <button id="newTaskBtn">新建</button>
+        <button id="deleteTaskBtn" class="danger" disabled>删除</button>
+      </div>
     </div>
     <div class="content stack">
-      <div class="stack">
-        <label>任务名称
-          <input id="taskNameInput" placeholder="政策日报任务">
+      <label class="field">任务名称
+        <input id="taskNameInput" placeholder="政策素材工作区">
+      </label>
+      <label class="field">固定信源
+        <select id="sourceSelectInput">
+          <option value="">加载中</option>
+        </select>
+      </label>
+      <label class="field">栏目页 URL
+        <input id="listPageUrlInput" placeholder="https://www.example.gov.cn/policy/">
+      </label>
+      <div class="row">
+        <label class="field" style="flex:1">开始日期（可不填）
+          <input id="startDateInput" type="date">
         </label>
-        <label>固定信源
-          <select id="sourceSelectInput">
-            <option value="">正在加载固定信源...</option>
-          </select>
-          <span class="status-line">选择后会自动填写栏目页 URL 和关键词；标记“需适配”的信源暂不可直接采集。</span>
+        <label class="field" style="flex:1">结束日期（可不填）
+          <input id="endDateInput" type="date">
         </label>
-        <label>栏目页 URL
-          <input id="listPageUrlInput" placeholder="https://www.xxx.gov.cn/...">
-        </label>
-        <div class="row">
-          <label style="flex:1">开始日期
-            <input id="startDateInput" type="date">
-          </label>
-          <label style="flex:1">结束日期
-            <input id="endDateInput" type="date">
-          </label>
-        </div>
-        <label>关键词
-          <input id="keywordsInput" placeholder="人工智能,智能制造,大模型">
-        </label>
-        <div class="row">
-          <label style="width:120px">最大链接数
-            <input id="maxLinksInput" type="number" min="1" value="10">
-          </label>
-          <label style="width:150px">自动摘要
-            <select id="autoSummarizeInput">
-              <option value="false">否</option>
-              <option value="true">是</option>
-            </select>
-          </label>
-          <button id="collectBtn" class="primary" style="align-self:end">收集</button>
-        </div>
       </div>
-      <div id="tasksList" class="stack"></div>
+      <label class="field">关键词
+        <input id="keywordsInput" placeholder="人工智能,智能制造,大模型">
+      </label>
+      <div class="row">
+        <label class="field" style="width:110px">最大链接数
+          <input id="maxLinksInput" type="number" min="1" value="20">
+        </label>
+        <button id="collectBtn" class="primary" style="align-self:end; flex:1">创建并采集</button>
+      </div>
+      <div id="taskStatus" class="status"></div>
+      <div id="tasksList" class="workspace-list"></div>
     </div>
   </section>
 
   <section>
     <div class="section-head">
-      <h2>审核列表</h2>
-      <span id="policyStatus" class="status-line"></span>
+      <h2 id="activeTaskTitle">政策链接</h2>
+      <span id="policyStatus" class="status"></span>
     </div>
-    <div class="content">
-      <div class="summary-grid">
-        <div class="metric"><strong id="totalCount">0</strong><span>全部</span></div>
-        <div class="metric"><strong id="pendingCount">0</strong><span>待审</span></div>
-        <div class="metric"><strong id="approvedCount">0</strong><span>通过</span></div>
-        <div class="metric"><strong id="rejectedCount">0</strong><span>驳回</span></div>
-        <div class="metric"><strong id="needsEditCount">0</strong><span>修改</span></div>
+    <div class="review-toolbar">
+      <div><span id="selectedCount" class="selection-count">已选 0 条</span><span id="totalCount" class="status"></span></div>
+      <div class="toolbar">
+        <button id="selectAllBtn" disabled>全选</button>
+        <button id="clearSelectionBtn" disabled>清空</button>
+        <button id="saveSelectionBtn" disabled>保存选择</button>
       </div>
-      <div id="policiesList" class="stack"></div>
     </div>
-  </section>
-
-  <section class="details-panel">
-    <div class="section-head">
-      <h2>详情</h2>
-      <span id="detailStatus" class="status-line"></span>
+    <div id="agentRunStrip" class="agent-strip" hidden>
+      <span><strong id="agentRunStatus">Agent</strong> <span id="agentRunStage"></span></span>
+      <span id="agentRunMeta"></span>
     </div>
-    <div class="content">
-      <div id="emptyDetail" class="empty">请选择政策</div>
-      <div id="detailForm" class="details" hidden>
-        <label>标题
-          <textarea id="titleEdit"></textarea>
-        </label>
-        <div class="row">
-          <label style="flex:1">来源单位
-            <input id="sourceNameEdit">
-          </label>
-          <label style="width:150px">发布日期
-            <input id="publishDateEdit" type="date">
-          </label>
-        </div>
-        <label>分类
-          <input id="categoryEdit">
-        </label>
-        <label>摘要
-          <textarea id="summaryEdit"></textarea>
-        </label>
-        <label>审核意见
-          <textarea id="reviewCommentEdit"></textarea>
-        </label>
-        <label>审核人
-          <input id="reviewedByEdit" placeholder="reviewer">
-        </label>
-        <div class="toolbar">
-          <button id="saveEditBtn">保存修改</button>
-          <button id="approveBtn" class="success">通过</button>
-          <button id="rejectBtn" class="danger">驳回</button>
-        </div>
-        <div>
-          <div class="meta">原文链接</div>
-          <a id="sourceUrlLink" href="#" target="_blank" rel="noopener"></a>
-        </div>
-        <div>
-          <div class="meta">证据片段</div>
-          <div id="evidenceBox" class="evidence"></div>
-        </div>
-      </div>
+    <div id="policiesList" class="content policy-list">
+      <div class="empty">请选择或创建一个工作区</div>
     </div>
   </section>
 </main>
+
+<dialog id="monthlyReportDialog">
+  <form id="monthlyReportForm">
+    <div class="dialog-head"><h2>生成工作月报</h2></div>
+    <div class="dialog-body">
+      <div class="form-grid">
+        <label class="field">报告月份
+          <input id="reportMonthInput" type="month" required>
+        </label>
+        <label class="field">统计截止日期
+          <input id="reportStatDateInput" type="date" required>
+        </label>
+        <label class="field">本年第几期
+          <input id="reportIssueInput" type="number" min="1" value="1" required>
+        </label>
+        <label class="field">总第几期
+          <input id="reportTotalIssueInput" type="number" min="1" value="1" required>
+        </label>
+      </div>
+      <label class="field">报送对象
+        <input id="reportToInput" placeholder="省有关领导">
+      </label>
+      <label class="field">发送对象
+        <input id="sendToInput" placeholder="各市工业和信息化局">
+      </label>
+      <label class="field">联系人及联系方式
+        <input id="reportContactInput" placeholder="姓名 0531-XXXXXXXX">
+      </label>
+    </div>
+    <div class="dialog-actions">
+      <button id="closeReportDialogBtn" type="button">取消</button>
+      <button id="reportSubmitBtn" class="primary" type="submit">生成并下载</button>
+    </div>
+  </form>
+</dialog>
 
 <script>
   const applicationUrl = window.location.protocol === 'file:'
     ? 'http://localhost:8081/'
     : `${window.location.origin}/`;
-  if (window.location.protocol === 'file:') {
-    window.location.replace(applicationUrl);
-  }
+  if (window.location.protocol === 'file:') window.location.replace(applicationUrl);
 
   const state = {
     tasks: [],
     policies: [],
     sources: [],
     selectedTaskId: null,
-    selectedPolicyId: null,
-    summary: null
+    selectedPolicyIds: new Set(),
+    selectionDirty: false,
+    agentRun: null
   };
 
   const $ = (id) => document.getElementById(id);
-
-  const localDateInputValue = () => {
-    const now = new Date();
-    const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    return localTime.toISOString().slice(0, 10);
-  };
-
-  const statusClass = (status) => {
-    if (status === 'APPROVED') return 'approved';
-    if (status === 'REJECTED') return 'rejected';
-    return 'pending';
-  };
-
-  const statusText = (status) => ({
-    PENDING_REVIEW: '待审核',
-    APPROVED: '已通过',
-    REJECTED: '已驳回',
-    NEEDS_EDIT: '已修改'
-  }[status] || status || '待审核');
 
   async function api(url, options = {}) {
     let response;
@@ -496,8 +412,8 @@
         headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
         ...options
       });
-    } catch (error) {
-      throw new Error(`无法连接后端服务。请通过 ${applicationUrl} 打开审核台，并确认服务已启动。`);
+    } catch (_) {
+      throw new Error(`无法连接后端服务：${applicationUrl}`);
     }
     if (!response.ok) {
       let message = response.statusText;
@@ -514,48 +430,34 @@
     try {
       const response = await api('/api/policy-sources');
       state.sources = await response.json();
-      renderSources();
+      const select = $('sourceSelectInput');
+      select.innerHTML = '<option value="">手动输入 URL</option>';
+      state.sources.forEach(source => {
+        const option = document.createElement('option');
+        option.value = source.id;
+        option.disabled = source.directCrawl === false;
+        option.textContent = `${source.name}${source.directCrawl === false ? '（需适配）' : ''}`;
+        select.appendChild(option);
+      });
     } catch (error) {
-      $('taskStatus').textContent = '\u56fa\u5b9a\u4fe1\u6e90\u52a0\u8f7d\u5931\u8d25: ' + error.message;
+      $('taskStatus').textContent = error.message;
     }
-  }
-
-  function renderSources() {
-    const select = $('sourceSelectInput');
-    select.innerHTML = '<option value="">&#25163;&#21160;&#36755;&#20837; URL</option>';
-    state.sources.forEach(source => {
-      const option = document.createElement('option');
-      option.value = source.id;
-      option.disabled = source.directCrawl === false;
-      const suffix = source.directCrawl === false ? '\u9700\u9002\u914d' : (source.region || source.level || '');
-      option.textContent = `${source.name} (${suffix})`;
-      select.appendChild(option);
-    });
   }
 
   function applySelectedSource() {
-    const sourceId = $('sourceSelectInput').value;
-    const source = state.sources.find(item => item.id === sourceId);
-    if (!source) {
-      return;
-    }
+    const source = state.sources.find(item => item.id === $('sourceSelectInput').value);
+    if (!source) return;
     $('listPageUrlInput').value = source.url || '';
     $('keywordsInput').value = Array.isArray(source.keywords) ? source.keywords.join(',') : '';
-    if (!$('taskNameInput').value) {
-      const today = localDateInputValue();
-      $('taskNameInput').value = `${today} ${source.name}`;
-    }
+    if (!$('taskNameInput').value) $('taskNameInput').value = source.name + '政策素材';
   }
 
-  async function loadTasks() {
-    $('taskStatus').textContent = '加载中';
-    try {
-      const response = await api('/api/tasks/recent');
-      state.tasks = await response.json();
-      renderTasks();
-      $('taskStatus').textContent = `${state.tasks.length} 个任务`;
-    } catch (error) {
-      $('taskStatus').textContent = error.message;
+  async function loadTasks(autoSelect = false) {
+    const response = await api('/api/tasks/recent');
+    state.tasks = await response.json();
+    renderTasks();
+    if (autoSelect && !state.selectedTaskId && state.tasks.length) {
+      await selectTask(state.tasks[0].id);
     }
   }
 
@@ -563,20 +465,18 @@
     const container = $('tasksList');
     container.innerHTML = '';
     if (!state.tasks.length) {
-      container.innerHTML = '<div class="empty">暂无任务</div>';
+      container.innerHTML = '<div class="empty">暂无工作区</div>';
       return;
     }
     state.tasks.forEach(task => {
       const node = document.createElement('div');
-      node.className = 'task' + (task.id === state.selectedTaskId ? ' active' : '');
+      node.className = 'workspace' + (task.id === state.selectedTaskId ? ' active' : '');
+      const range = task.targetStartDate || task.targetEndDate
+        ? `${task.targetStartDate || task.targetEndDate} 至 ${task.targetEndDate || task.targetStartDate}`
+        : '不限发布日期';
       node.innerHTML = `
-        <div class="title">${escapeHtml(task.taskName || ('任务 ' + task.id))}</div>
-        <div class="meta">${escapeHtml(task.targetStartDate || 'open')} 至 ${escapeHtml(task.targetEndDate || 'open')}</div>
-        <div class="badges">
-          <span class="badge">${escapeHtml(task.status || '')}</span>
-          <span class="badge">保存 ${task.savedCount || 0}</span>
-          <span class="badge">失败 ${task.failedCount || 0}</span>
-        </div>
+        <div class="workspace-title">${escapeHtml(task.taskName || ('工作区 ' + task.id))}</div>
+        <div class="workspace-meta">${escapeHtml(range)} · 已采集 ${task.savedCount || 0} 条</div>
       `;
       node.addEventListener('click', () => selectTask(task.id));
       container.appendChild(node);
@@ -585,231 +485,296 @@
 
   async function selectTask(taskId) {
     state.selectedTaskId = taskId;
-    state.selectedPolicyId = null;
+    state.selectionDirty = false;
+    const task = state.tasks.find(item => item.id === taskId);
+    if (task) {
+      $('taskNameInput').value = task.taskName || '';
+      $('listPageUrlInput').value = task.sourceUrl || '';
+      $('startDateInput').value = task.targetStartDate || '';
+      $('endDateInput').value = task.targetEndDate || '';
+      $('keywordsInput').value = task.topics || '';
+      $('activeTaskTitle').textContent = task.taskName || `工作区 ${taskId}`;
+    }
     renderTasks();
-    await Promise.all([loadSummary(taskId), loadPolicies(taskId)]);
-    renderDetail(null);
+    updateWorkspaceButtons();
+    await Promise.all([loadPolicies(taskId), loadAgentRun(taskId)]);
   }
 
-  async function loadSummary(taskId) {
-    const response = await api(`/api/review/tasks/${taskId}/summary`);
-    state.summary = await response.json();
-    renderSummary();
+  function newWorkspace() {
+    state.selectedTaskId = null;
+    state.policies = [];
+    state.selectedPolicyIds = new Set();
+    state.selectionDirty = false;
+    $('taskNameInput').value = '';
+    $('listPageUrlInput').value = '';
+    $('startDateInput').value = '';
+    $('endDateInput').value = '';
+    $('keywordsInput').value = '';
+    $('activeTaskTitle').textContent = '政策链接';
+    $('policiesList').innerHTML = '<div class="empty">填写栏目页后开始采集</div>';
+    $('agentRunStrip').hidden = true;
+    renderTasks();
+    updateWorkspaceButtons();
+    renderSelectionState();
   }
 
-  function renderSummary() {
-    const summary = state.summary || {};
-    $('totalCount').textContent = summary.totalCount || 0;
-    $('pendingCount').textContent = summary.pendingCount || 0;
-    $('approvedCount').textContent = summary.approvedCount || 0;
-    $('rejectedCount').textContent = summary.rejectedCount || 0;
-    $('needsEditCount').textContent = summary.needsEditCount || 0;
-    $('generateBtn').disabled = !state.selectedTaskId || !(summary.approvedCount > 0);
+  async function deleteWorkspace() {
+    if (!state.selectedTaskId) return;
+    const task = state.tasks.find(item => item.id === state.selectedTaskId);
+    if (!window.confirm(`删除“${task?.taskName || state.selectedTaskId}”及其中全部政策素材？`)) return;
+    await api(`/api/tasks/${state.selectedTaskId}`, { method: 'DELETE' });
+    newWorkspace();
+    await loadTasks(false);
+    $('taskStatus').textContent = '工作区已删除';
   }
 
-  async function loadPolicies(taskId) {
-    $('policyStatus').textContent = '加载中';
-    const response = await api(`/api/review/tasks/${taskId}/policies`);
-    state.policies = await response.json();
-    renderPolicies();
-    $('policyStatus').textContent = `${state.policies.length} 条政策`;
-  }
-
-  function renderPolicies() {
-    const container = $('policiesList');
-    container.innerHTML = '';
-    if (!state.policies.length) {
-      container.innerHTML = '<div class="empty">暂无政策</div>';
-      return;
-    }
-    state.policies.forEach(policy => {
-      const node = document.createElement('div');
-      node.className = 'policy' + (policy.id === state.selectedPolicyId ? ' active' : '');
-      node.innerHTML = `
-        <div class="title">${escapeHtml(policy.title || '')}</div>
-        <div class="meta">${escapeHtml(policy.sourceName || '')} · ${escapeHtml(policy.publishDate || '日期未知')}</div>
-        <div class="meta">${escapeHtml(policy.sourceDomain || '')}</div>
-        <div class="badges">
-          <span class="badge ${statusClass(policy.reviewStatus)}">${statusText(policy.reviewStatus)}</span>
-          <span class="badge">${escapeHtml(policy.authorityLevel || 'UNVERIFIED')}</span>
-          <span class="badge">${escapeHtml(policy.filterStatus || '')}</span>
-        </div>
-      `;
-      node.addEventListener('click', () => {
-        state.selectedPolicyId = policy.id;
-        renderPolicies();
-        renderDetail(policy);
-      });
-      container.appendChild(node);
-    });
-  }
-
-  function renderDetail(policy) {
-    if (!policy) {
-      $('emptyDetail').hidden = false;
-      $('detailForm').hidden = true;
-      $('detailStatus').textContent = '';
-      return;
-    }
-    $('emptyDetail').hidden = true;
-    $('detailForm').hidden = false;
-    $('detailStatus').textContent = statusText(policy.reviewStatus);
-    $('titleEdit').value = policy.title || '';
-    $('sourceNameEdit').value = policy.sourceName || '';
-    $('publishDateEdit').value = policy.publishDate || '';
-    $('categoryEdit').value = policy.category || '';
-    $('summaryEdit').value = policy.summary || '';
-    $('reviewCommentEdit').value = policy.reviewComment || '';
-    $('reviewedByEdit').value = policy.reviewedBy || '';
-    $('sourceUrlLink').href = policy.sourceUrl || '#';
-    $('sourceUrlLink').textContent = policy.sourceUrl || '';
-    $('evidenceBox').textContent = policy.evidenceSnippet || policy.content || '';
-  }
-
-  async function collectTask() {
-    const keywords = $('keywordsInput').value
-      .split(',')
-      .map(item => item.trim())
-      .filter(Boolean);
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
-
-    const payload = {
-      taskName: $('taskNameInput').value || null,
-      listPageUrl: $('listPageUrlInput').value,
-      targetStartDate: $('startDateInput').value || null,
-      targetEndDate: $('endDateInput').value || null,
-      keywords,
-      maxLinks: Number($('maxLinksInput').value || 10),
-      autoSummarize: $('autoSummarizeInput').value === 'true'
-    };
-    if (payload.targetStartDate > payload.targetEndDate) {
+  async function collectPolicies() {
+    const startDate = $('startDateInput').value || null;
+    const endDate = $('endDateInput').value || null;
+    if (startDate && endDate && startDate > endDate) {
       $('taskStatus').textContent = '开始日期不能晚于结束日期';
       return;
     }
-    if (!payload.listPageUrl) {
+    if (!$('listPageUrlInput').value.trim()) {
       $('taskStatus').textContent = '请填写栏目页 URL';
       return;
     }
-    $('taskStatus').textContent = '收集中';
+
+    const payload = {
+      listPageUrl: $('listPageUrlInput').value.trim(),
+      keywords: $('keywordsInput').value.split(',').map(item => item.trim()).filter(Boolean),
+      maxLinks: Number($('maxLinksInput').value || 20),
+      autoSummarize: false,
+      targetStartDate: startDate,
+      targetEndDate: endDate,
+      taskName: $('taskNameInput').value.trim() || null,
+      taskId: state.selectedTaskId
+    };
+
+    $('collectBtn').disabled = true;
+    $('taskStatus').textContent = state.selectedTaskId ? '正在追加采集' : '正在创建并采集';
     try {
       const response = await api('/api/search/discover-and-save', {
         method: 'POST',
         body: JSON.stringify(payload)
       });
       const result = await response.json();
-      await loadTasks();
+      await loadTasks(false);
       await selectTask(result.taskId);
-      $('taskStatus').textContent = '收集完成';
+      $('taskStatus').textContent = `完成：新增 ${result.savedCount} 条，重复 ${result.duplicateCount} 条`;
     } catch (error) {
       $('taskStatus').textContent = error.message;
+    } finally {
+      $('collectBtn').disabled = false;
     }
   }
 
-  async function saveEdit() {
-    const policy = selectedPolicy();
-    if (!policy) return;
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
-
-    const payload = {
-      title: $('titleEdit').value,
-      sourceName: $('sourceNameEdit').value,
-      publishDate: $('publishDateEdit').value || null,
-      category: $('categoryEdit').value,
-      summary: $('summaryEdit').value,
-      reviewComment: $('reviewCommentEdit').value,
-      reviewedBy: $('reviewedByEdit').value
-    };
-    await api(`/api/review/policies/${policy.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload)
-    });
-    await reloadSelectedTask('已保存');
+  async function loadPolicies(taskId) {
+    $('policyStatus').textContent = '加载中';
+    const response = await api(`/api/review/tasks/${taskId}/policies`);
+    state.policies = await response.json();
+    state.selectedPolicyIds = new Set(
+      state.policies.filter(policy => policy.reviewStatus === 'APPROVED').map(policy => policy.id)
+    );
+    state.selectionDirty = false;
+    renderPolicies();
+    $('policyStatus').textContent = `${state.policies.length} 条`;
   }
 
-  async function reviewPolicy(action) {
-    const policy = selectedPolicy();
-    if (!policy) return;
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
+  function renderPolicies() {
+    const container = $('policiesList');
+    container.innerHTML = '';
+    if (!state.policies.length) {
+      container.innerHTML = '<div class="empty">当前工作区暂无政策链接</div>';
+      renderSelectionState();
+      return;
+    }
+    state.policies.forEach(policy => {
+      const selected = state.selectedPolicyIds.has(policy.id);
+      const row = document.createElement('div');
+      row.className = 'policy-row' + (selected ? ' selected' : '');
+      const excerpt = shortText(policy.summary || policy.evidenceSnippet || policy.content || '正文抓取结果为空', 260);
+      row.innerHTML = `
+        <input type="checkbox" aria-label="选择政策" ${selected ? 'checked' : ''}>
+        <div>
+          <a class="policy-title" href="${escapeAttribute(policy.sourceUrl || '#')}" target="_blank" rel="noopener">${escapeHtml(policy.title || '未命名政策')}</a>
+          <div class="policy-meta">${escapeHtml(policy.sourceName || '来源待核验')} · ${escapeHtml(policy.publishDate || '日期待核验')}</div>
+          <p class="policy-excerpt">${escapeHtml(excerpt)}</p>
+        </div>
+        <a class="open-link" href="${escapeAttribute(policy.sourceUrl || '#')}" target="_blank" rel="noopener">打开原文</a>
+      `;
+      row.querySelector('input').addEventListener('change', event => {
+        if (event.target.checked) state.selectedPolicyIds.add(policy.id);
+        else state.selectedPolicyIds.delete(policy.id);
+        state.selectionDirty = true;
+        renderPolicies();
+      });
+      container.appendChild(row);
+    });
+    renderSelectionState();
+  }
 
-    const payload = {
-      reviewedBy: $('reviewedByEdit').value,
-      reviewComment: $('reviewCommentEdit').value
-    };
-    await api(`/api/review/policies/${policy.id}/${action}`, {
+  function selectAll() {
+    state.selectedPolicyIds = new Set(state.policies.map(policy => policy.id));
+    state.selectionDirty = true;
+    renderPolicies();
+  }
+
+  function clearSelection() {
+    state.selectedPolicyIds.clear();
+    state.selectionDirty = true;
+    renderPolicies();
+  }
+
+  async function saveSelection(showMessage = true) {
+    if (!state.selectedTaskId) return;
+    const response = await api(`/api/review/tasks/${state.selectedTaskId}/selection`, {
       method: 'POST',
-      body: JSON.stringify(payload)
+      body: JSON.stringify({ policyIds: [...state.selectedPolicyIds], reviewedBy: 'web-reviewer' })
     });
-    await reloadSelectedTask(action === 'approve' ? '已通过' : '已驳回');
+    await response.json();
+    state.policies = state.policies.map(policy => ({
+      ...policy,
+      reviewStatus: state.selectedPolicyIds.has(policy.id) ? 'APPROVED' : 'PENDING_REVIEW'
+    }));
+    state.selectionDirty = false;
+    renderSelectionState();
+    if (showMessage) $('globalStatus').textContent = '选择已保存';
   }
 
-  async function reloadSelectedTask(message) {
-    if (!state.selectedTaskId) return;
-    await Promise.all([loadSummary(state.selectedTaskId), loadPolicies(state.selectedTaskId)]);
-    const policy = state.policies.find(item => item.id === state.selectedPolicyId);
-    renderDetail(policy || null);
-    $('detailStatus').textContent = message;
+  function openReportDialog() {
+    if (!state.selectedTaskId || !state.selectedPolicyIds.size) return;
+    const now = new Date();
+    if (!$('reportMonthInput').value) {
+      $('reportMonthInput').value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    }
+    if (!$('reportStatDateInput').value) setReportMonthEndDate();
+    $('monthlyReportDialog').showModal();
   }
 
-  async function generateReport() {
-    if (!state.selectedTaskId) return;
-    $('taskStatus').textContent = '生成中';
+  function setReportMonthEndDate() {
+    const value = $('reportMonthInput').value;
+    if (!value) return;
+    const [year, month] = value.split('-').map(Number);
+    const lastDay = new Date(year, month, 0).getDate();
+    $('reportStatDateInput').value = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+  }
+
+  async function generateReport(event) {
+    event.preventDefault();
+    if (!state.selectedTaskId || !state.selectedPolicyIds.size) return;
+    const monthValue = $('reportMonthInput').value;
+    const [reportYear] = monthValue.split('-').map(Number);
+    const payload = {
+      reportYear,
+      issueNo: Number($('reportIssueInput').value),
+      totalIssueNo: Number($('reportTotalIssueInput').value),
+      reportMonth: monthValue,
+      statDate: $('reportStatDateInput').value,
+      reportTo: $('reportToInput').value.trim(),
+      sendTo: $('sendToInput').value.trim(),
+      contactInfo: $('reportContactInput').value.trim()
+    };
+
+    $('generateBtn').disabled = true;
+    $('reportSubmitBtn').disabled = true;
+    $('globalStatus').textContent = 'Agent 正在整理所选材料并填充月报模板';
     try {
-      const response = await fetch(`/api/daily-tasks/${state.selectedTaskId}/reports`, { method: 'POST' });
-      if (!response.ok) {
-        const body = await response.json();
-        throw new Error(body.message || response.statusText);
-      }
+      await saveSelection(false);
+      const response = await api(`/api/reports/monthly/tasks/${state.selectedTaskId}`, {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
       const blob = await response.blob();
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `政策日报_任务${state.selectedTaskId}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `山东省人工智能赋能制造业工作月报_${monthValue}.docx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
       URL.revokeObjectURL(url);
-      $('taskStatus').textContent = '已生成';
+      $('monthlyReportDialog').close();
+      $('globalStatus').textContent = '模板月报已生成';
+      await loadAgentRun(state.selectedTaskId);
     } catch (error) {
-      $('taskStatus').textContent = error.message;
+      $('globalStatus').textContent = error.message;
+    } finally {
+      $('reportSubmitBtn').disabled = false;
+      renderSelectionState();
     }
   }
+  async function loadAgentRun(taskId) {
+    try {
+      const response = await fetch(`/api/agent/tasks/${taskId}`);
+      state.agentRun = response.ok ? await response.json() : null;
+    } catch (_) {
+      state.agentRun = null;
+    }
+    const strip = $('agentRunStrip');
+    if (!state.agentRun?.run) {
+      strip.hidden = true;
+      return;
+    }
+    const run = state.agentRun.run;
+    const steps = state.agentRun.steps || [];
+    const labels = {
+      RUNNING: '执行中', WAITING_REVIEW: '等待选择素材', READY_FOR_REPORT: '可生成',
+      GENERATING_REPORT: '生成中', COMPLETED: '已完成', PARTIAL_SUCCESS: '部分完成', FAILED: '失败'
+    };
+    $('agentRunStatus').textContent = `Agent · ${labels[run.status] || run.status}`;
+    $('agentRunStage').textContent = run.currentStage || '';
+    $('agentRunMeta').textContent = `${steps.length} 次 Tool 调用`;
+    strip.title = run.lastError || '';
+    strip.hidden = false;
+  }
 
-  function selectedPolicy() {
-    return state.policies.find(item => item.id === state.selectedPolicyId);
+  function renderSelectionState() {
+    const selected = state.selectedPolicyIds.size;
+    $('selectedCount').textContent = `已选 ${selected} 条`;
+    $('totalCount').textContent = ` / 共 ${state.policies.length} 条`;
+    $('selectAllBtn').disabled = !state.policies.length;
+    $('clearSelectionBtn').disabled = !selected;
+    $('saveSelectionBtn').disabled = !state.selectedTaskId || !state.selectionDirty;
+    $('generateBtn').disabled = !state.selectedTaskId || selected === 0;
+  }
+
+  function updateWorkspaceButtons() {
+    const active = Boolean(state.selectedTaskId);
+    $('deleteTaskBtn').disabled = !active;
+    $('collectBtn').textContent = active ? '追加采集' : '创建并采集';
+  }
+
+  function shortText(value, maxLength) {
+    const normalized = String(value || '').replace(/\s+/g, ' ').trim();
+    return normalized.length <= maxLength ? normalized : normalized.slice(0, maxLength) + '…';
   }
 
   function escapeHtml(value) {
     return String(value ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
+      .replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;').replaceAll("'", '&#039;');
   }
 
-  $('refreshTasksBtn').addEventListener('click', loadTasks);
+  function escapeAttribute(value) { return escapeHtml(value); }
+
   $('sourceSelectInput').addEventListener('change', applySelectedSource);
-  $('collectBtn').addEventListener('click', collectTask);
-  $('saveEditBtn').addEventListener('click', saveEdit);
-  $('approveBtn').addEventListener('click', () => reviewPolicy('approve'));
-  $('rejectBtn').addEventListener('click', () => reviewPolicy('reject'));
-  $('generateBtn').addEventListener('click', generateReport);
+  $('newTaskBtn').addEventListener('click', newWorkspace);
+  $('deleteTaskBtn').addEventListener('click', deleteWorkspace);
+  $('collectBtn').addEventListener('click', collectPolicies);
+  $('selectAllBtn').addEventListener('click', selectAll);
+  $('clearSelectionBtn').addEventListener('click', clearSelection);
+  $('saveSelectionBtn').addEventListener('click', () => saveSelection(true));
+  $('generateBtn').addEventListener('click', openReportDialog);
+  $('monthlyReportForm').addEventListener('submit', generateReport);
+  $('reportMonthInput').addEventListener('change', setReportMonthEndDate);
+  $('closeReportDialogBtn').addEventListener('click', () => $('monthlyReportDialog').close());
 
-  const defaultDate = localDateInputValue();
-  $('startDateInput').value = defaultDate;
-  $('endDateInput').value = defaultDate;
-
-  loadSources();
-  loadTasks();
+  updateWorkspaceButtons();
+  renderSelectionState();
+  Promise.all([loadSources(), loadTasks(true)]).catch(error => {
+    $('globalStatus').textContent = error.message;
+  });
 </script>
 </body>
 </html>
