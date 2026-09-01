@@ -76,8 +76,7 @@ public class PolicyCandidateQueryService {
                 policies.size(),
                 count(policies, PolicyReviewStatus.PENDING),
                 count(policies, PolicyReviewStatus.ACCEPTED),
-                count(policies, PolicyReviewStatus.REJECTED),
-                count(policies, PolicyReviewStatus.DEFERRED)
+                count(policies, PolicyReviewStatus.REJECTED)
         );
     }
 

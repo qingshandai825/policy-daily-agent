@@ -45,8 +45,7 @@ public class PolicyReviewService {
                 policyDocumentRepository.countBySearchTaskId(searchTaskId),
                 count(searchTaskId, PolicyReviewStatus.PENDING),
                 count(searchTaskId, PolicyReviewStatus.ACCEPTED),
-                count(searchTaskId, PolicyReviewStatus.REJECTED),
-                count(searchTaskId, PolicyReviewStatus.DEFERRED)
+                count(searchTaskId, PolicyReviewStatus.REJECTED)
         );
     }
 
@@ -64,11 +63,6 @@ public class PolicyReviewService {
     @Transactional
     public PolicyDocument reject(Long policyId, PolicyReviewRequest request) {
         return transition(policyId, PolicyReviewStatus.REJECTED, request);
-    }
-
-    @Transactional
-    public PolicyDocument defer(Long policyId, PolicyReviewRequest request) {
-        return transition(policyId, PolicyReviewStatus.DEFERRED, request);
     }
 
     @Transactional

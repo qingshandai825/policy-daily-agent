@@ -5,7 +5,6 @@ public record ReviewTaskSummary(
         long totalCount,
         long pendingCount,
         long acceptedCount,
-        long rejectedCount,
-        long deferredCount
+        long rejectedCount
 ) {
 }

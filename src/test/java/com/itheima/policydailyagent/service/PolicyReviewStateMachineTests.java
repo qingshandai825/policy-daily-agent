@@ -13,7 +13,7 @@ class PolicyReviewStateMachineTests {
     @Test
     void shouldAllowHumanToChangeDecision() {
         assertThatCode(() -> stateMachine.validateTransition(
-                PolicyReviewStatus.DEFERRED,
+                PolicyReviewStatus.PENDING,
                 PolicyReviewStatus.ACCEPTED
         )).doesNotThrowAnyException();
     }

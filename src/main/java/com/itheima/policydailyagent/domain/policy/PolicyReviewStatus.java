@@ -6,6 +6,5 @@ package com.itheima.policydailyagent.domain.policy;
 public enum PolicyReviewStatus {
     PENDING,
     ACCEPTED,
-    REJECTED,
-    DEFERRED
+    REJECTED
 }

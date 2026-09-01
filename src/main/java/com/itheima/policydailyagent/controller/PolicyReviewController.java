@@ -70,14 +70,6 @@ public class PolicyReviewController {
         return execute(() -> policyReviewService.reject(policyId, request));
     }
 
-    @PostMapping("/policies/{policyId}/defer")
-    public ResponseEntity<?> defer(
-            @PathVariable Long policyId,
-            @RequestBody PolicyReviewRequest request
-    ) {
-        return execute(() -> policyReviewService.defer(policyId, request));
-    }
-
     @PostMapping("/policies/{policyId}/pending")
     public ResponseEntity<?> resetToPending(
             @PathVariable Long policyId,
