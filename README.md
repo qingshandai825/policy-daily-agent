@@ -97,7 +97,6 @@ docker compose up -d
 - `GET /api/review/search-tasks/{id}/policies/{policyId}`：候选政策正文详情
 - `POST /api/review/policies/{id}/accept|reject|defer|pending`：人工审核
 - `GET /api/review/policies/{id}/history`：审核历史
-- `POST /api/search/discover-and-save`：旧单栏目页兼容入口，仍会写入统一候选关联
 - `POST /api/monthly-reports`：按年月创建或获取月报工作区
 - `GET /api/monthly-reports/{reportId}/editor`：按模板栏目读取月报编辑工作区、来源和修订历史
 - `PUT /api/monthly-reports/{reportId}/items/{itemId}`：人工修改标题、正文或栏目，带乐观锁版本
