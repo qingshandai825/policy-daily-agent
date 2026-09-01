@@ -10,23 +10,32 @@ qianfan:
 
 spring:
   application:
-    name: policy-daily-agent
+    name: policy-monthly-report-agent
 
   datasource:
-    url: ${POLICY_DAILY_DB_URL:jdbc:postgresql://localhost:5432/policy_daily_agent}
-    username: ${POLICY_DAILY_DB_USERNAME:opspilot}
-    password: ${POLICY_DAILY_DB_PASSWORD:change-me-in-production}
+    url: ${POLICY_MONTHLY_DB_URL:${POLICY_DAILY_DB_URL:jdbc:postgresql://localhost:5432/policy_daily_agent}}
+    username: ${POLICY_MONTHLY_DB_USERNAME:${POLICY_DAILY_DB_USERNAME:opspilot}}
+    password: ${POLICY_MONTHLY_DB_PASSWORD:${POLICY_DAILY_DB_PASSWORD:change-me-in-production}}
     driver-class-name: org.postgresql.Driver
 
   jpa:
     hibernate:
-      ddl-auto: update
-    show-sql: true
+      ddl-auto: validate
+    open-in-view: false
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
   ai:
+    model:
+      chat: ${POLICY_AGENT_MODEL:none}
     deepseek:
       api-key: ${DEEPSEEK_API_KEY:}
       base-url: https://api.deepseek.com

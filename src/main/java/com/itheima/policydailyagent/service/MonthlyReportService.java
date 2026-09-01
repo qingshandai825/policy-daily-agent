@@ -1,615 +1,442 @@
 package com.itheima.policydailyagent.service;
 
+import com.itheima.policydailyagent.domain.report.*;
 import com.itheima.policydailyagent.dto.MonthlyReportGenerateRequest;
-import com.itheima.policydailyagent.entity.PolicyDocument;
-import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
-import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.apache.poi.xwpf.usermodel.XWPFParagraph;
-import org.apache.poi.xwpf.usermodel.XWPFRun;
-import org.apache.poi.xwpf.usermodel.XWPFTable;
-import org.apache.poi.xwpf.usermodel.XWPFTableCell;
-import org.apache.poi.xwpf.usermodel.XWPFTableRow;
+import com.itheima.policydailyagent.dto.MonthlyReportGenerationResult;
+import com.itheima.policydailyagent.dto.MonthlyReportGenerationView;
+import com.itheima.policydailyagent.repository.MonthlyReportGenerationRepository;
+import com.itheima.policydailyagent.repository.MonthlyReportItemRepository;
+import com.itheima.policydailyagent.repository.MonthlyReportRepository;
+import com.itheima.policydailyagent.repository.ReportSectionRepository;
+import org.apache.poi.xwpf.usermodel.*;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
-import java.time.YearMonth;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.security.MessageDigest;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class MonthlyReportService {
 
-    private static final String FONT_FANGSONG_GB2312 = "仿宋_GB2312";
-    private static final int FONT_SIZE_THIRD = 16; // 三号 = 16pt
+    private static final String TEMPLATE_PATH = "templates/monthly_report_template.docx";
+    private static final String TEMPLATE_VERSION = "v2-no-attachment";
+    private static final String TEMPLATE_SHA256 = "28B6D1314C04521444089A5B623266FEDF674C3A77FE8DA893CA3F623E5508A2";
+    private static final String DOCX_CONTENT_TYPE =
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    private static final Set<String> CONTENT_SECTION_CODES = Set.of(
+            "NATIONAL",
+            "PROVINCIAL",
+            "PIONEER_OVERALL",
+            "PIONEER_INDICATORS",
+            "PIONEER_SUPPORT",
+            "PIONEER_EXPERIENCE",
+            "CASE",
+            "TREND"
+    );
 
-    private final PolicyDocumentRepository policyDocumentRepository;
-    private final MonthlyReportAiService monthlyReportAiService;
+    private final MonthlyReportRepository monthlyReportRepository;
+    private final MonthlyReportItemRepository monthlyReportItemRepository;
+    private final ReportSectionRepository reportSectionRepository;
+    private final MonthlyReportGenerationRepository generationRepository;
 
     public MonthlyReportService(
-            PolicyDocumentRepository policyDocumentRepository,
-            MonthlyReportAiService monthlyReportAiService
+            MonthlyReportRepository monthlyReportRepository,
+            MonthlyReportItemRepository monthlyReportItemRepository,
+            ReportSectionRepository reportSectionRepository,
+            MonthlyReportGenerationRepository generationRepository
     ) {
-        this.policyDocumentRepository = policyDocumentRepository;
-        this.monthlyReportAiService = monthlyReportAiService;
+        this.monthlyReportRepository = monthlyReportRepository;
+        this.monthlyReportItemRepository = monthlyReportItemRepository;
+        this.reportSectionRepository = reportSectionRepository;
+        this.generationRepository = generationRepository;
     }
 
-    public byte[] generateMonthlyReport(MonthlyReportGenerateRequest request) {
-        MonthlyReportGenerateRequest safeRequest = request == null
-                ? new MonthlyReportGenerateRequest(null, null, null, null, null, null, null, null)
-                : request;
-
-        List<PolicyDocument> documents =
-                policyDocumentRepository.findTop20ByStatusOrderByPublishDateDescCreatedAtDesc("SUMMARIZED");
-
-        List<PolicyDocument> nationalDocuments = documents.stream()
-                .filter(this::isNationalPolicy)
-                .toList();
-
-        List<PolicyDocument> provincialDocuments = documents.stream()
-                .filter(this::isProvincialPolicy)
-                .toList();
-
-        Map<String, String> placeholders = buildPlaceholderMap(
-                safeRequest,
-                nationalDocuments,
-                provincialDocuments
-        );
-
-        return generateReportFromPlaceholders(placeholders);
-    }
-
-    private byte[] generateReportFromPlaceholders(Map<String, String> placeholders) {
-        try (InputStream inputStream = new ClassPathResource("templates/monthly_report_template.docx").getInputStream();
-             XWPFDocument document = new XWPFDocument(inputStream);
-             ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
-
-            replaceSectionPlaceholdersWithFormattedRuns(document, placeholders);
-            replaceKeyPointPlaceholdersWithBullets(document, placeholders);
-            replaceNormalPlaceholders(document, placeholders);
-
-            document.write(outputStream);
-            return outputStream.toByteArray();
-
-        } catch (Exception e) {
-            throw new RuntimeException(
-                    "Word report generation failed: " + e.getClass().getSimpleName() + " - " + e.getMessage(),
-                    e
-            );
+    /**
+     * Word 生成是确定性步骤：只读取人工确认后的内容，不调用 LLM。
+     */
+    @Transactional
+    public MonthlyReportGenerationResult generateMonthlyReport(MonthlyReportGenerateRequest request) {
+        if (request == null || request.reportId() == null) {
+            throw new IllegalArgumentException("reportId 不能为空");
         }
+        validateGenerationRequest(request);
+
+        MonthlyReport report = monthlyReportRepository.findByIdForUpdate(request.reportId())
+                .orElseThrow(() -> new IllegalArgumentException("月报不存在，id=" + request.reportId()));
+
+        if (report.getStatus() != MonthlyReportStatus.CONTENT_CONFIRMED) {
+            throw new IllegalArgumentException("只有 CONTENT_CONFIRMED 状态的月报可以生成正式 Word");
+        }
+
+        List<MonthlyReportItem> items = monthlyReportItemRepository
+                .findByReportIdAndStatusOrderBySectionIdAscSortOrderAsc(
+                        report.getId(),
+                        ReportItemStatus.CONFIRMED
+                );
+
+        if (items.isEmpty()) {
+            throw new IllegalArgumentException("月报尚无已确认内容，不能生成正式 Word");
+        }
+        validateConfirmedItems(items);
+
+        Map<Long, String> sectionCodes = reportSectionRepository.findAll().stream()
+                .collect(Collectors.toMap(ReportSection::getId, ReportSection::getSectionCode));
+
+        Map<String, List<MonthlyReportItem>> itemsBySection = items.stream()
+                .collect(Collectors.groupingBy(
+                        item -> sectionCodes.getOrDefault(item.getSectionId(), ""),
+                        LinkedHashMap::new,
+                        Collectors.toList()
+                ));
+        validateSectionMappings(itemsBySection);
+
+        Map<String, String> placeholders = buildPlaceholderMap(request, report, itemsBySection);
+        byte[] fileBytes = fillTemplate(placeholders);
+        String outputHash = sha256(fileBytes);
+        String outputFileName = safeFileName(report.getTitle()) + ".docx";
+        String reportMonth = report.getReportYear() + "年" + report.getReportMonth() + "月";
+
+        MonthlyReportGeneration generation = new MonthlyReportGeneration();
+        generation.setReportId(report.getId());
+        generation.setGenerationNo(generationRepository
+                .findTopByReportIdOrderByGenerationNoDesc(report.getId())
+                .map(existing -> existing.getGenerationNo() + 1)
+                .orElse(1));
+        generation.setIssueNo(request.issueNo());
+        generation.setTotalIssueNo(request.totalIssueNo());
+        generation.setReportMonth(reportMonth);
+        generation.setReportTo(request.reportTo().trim());
+        generation.setSendTo(request.sendTo().trim());
+        generation.setContactInfo(request.contactInfo().trim());
+        generation.setGeneratedBy(request.generatedBy().trim());
+        generation.setFileName(outputFileName);
+        generation.setContentType(DOCX_CONTENT_TYPE);
+        generation.setFileSize(fileBytes.length);
+        generation.setSha256(outputHash);
+        generation.setFileContent(fileBytes);
+        generation = generationRepository.save(generation);
+
+        report.setStatus(MonthlyReportStatus.GENERATED);
+        report.setGeneratedAt(LocalDateTime.now());
+        report.setTemplateVersion(TEMPLATE_VERSION);
+        report.setTemplateHash(TEMPLATE_SHA256);
+        report.setOutputFileName(outputFileName);
+        report.setOutputHash(outputHash);
+        monthlyReportRepository.save(report);
+
+        return resultOf(generation);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MonthlyReportGenerationView> listGenerations(Long reportId) {
+        if (!monthlyReportRepository.existsById(reportId)) {
+            throw new IllegalArgumentException("月报不存在，id=" + reportId);
+        }
+        return generationRepository.findByReportIdOrderByGenerationNoDesc(reportId).stream()
+                .map(this::viewOf)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public MonthlyReportGenerationResult downloadGeneration(Long reportId, Long generationId) {
+        if (!monthlyReportRepository.existsById(reportId)) {
+            throw new IllegalArgumentException("月报不存在，id=" + reportId);
+        }
+        MonthlyReportGeneration generation = generationRepository
+                .findByIdAndReportId(generationId, reportId)
+                .orElseThrow(() -> new IllegalArgumentException("生成档案不存在或不属于当前月报"));
+        return resultOf(generation);
     }
 
     private Map<String, String> buildPlaceholderMap(
             MonthlyReportGenerateRequest request,
-            List<PolicyDocument> nationalDocuments,
-            List<PolicyDocument> provincialDocuments
+            MonthlyReport report,
+            Map<String, List<MonthlyReportItem>> itemsBySection
     ) {
-        String reportMonth = hasText(request.reportMonth())
-                ? request.reportMonth()
-                : YearMonth.now().format(DateTimeFormatter.ofPattern("yyyy年M月"));
-
-        Map<String, String> map = new HashMap<>();
-
-        map.put("{{REPORT_MONTH}}", reportMonth);
-
-        map.put(
-                "{{KEY_POINTS_NATIONAL}}",
-                monthlyReportAiService.generateKeyPoints(
-                        "国家重点事项",
-                        nationalDocuments,
-                        "本期暂无国家重点事项自动检索结果。"
-                )
-        );
-
-        map.put(
-                "{{KEY_POINTS_PROVINCIAL}}",
-                monthlyReportAiService.generateKeyPoints(
-                        "省内工作推进",
-                        provincialDocuments,
-                        "本期暂无省内工作推进自动检索结果。"
-                )
-        );
-
-        map.put(
-                "{{KEY_POINTS_PIONEER}}",
-                "本期先锋应用动态待结合地市调度数据和进度统计表补充。"
-        );
-
-        map.put(
-                "{{KEY_POINTS_CASE}}",
-                "本期典型应用案例待结合企业案例库和公开材料补充。"
-        );
-
-        map.put(
-                "{{KEY_POINTS_TREND}}",
-                "本期产业趋势洞察待结合政策动态、行业案例和公开资料进一步研判。"
-        );
-
-        map.put(
-                "{{SECTION_NATIONAL}}",
-                monthlyReportAiService.generateNationalSection(
-                        nationalDocuments,
-                        "本期暂无国家重点事项自动检索结果。"
-                )
-        );
-
-        map.put(
-                "{{SECTION_PROVINCIAL}}",
-                monthlyReportAiService.generateProvincialSection(
-                        provincialDocuments,
-                        "本期暂无省内工作推进自动检索结果。"
-                )
-        );
-
-        map.put(
-                "{{SECTION_CASE}}",
-                "本期典型应用案例待结合企业案例库和公开材料补充。"
-        );
-
-        map.put(
-                "{{SECTION_TREND}}",
-                "本期产业趋势洞察待结合政策动态、行业案例和公开资料进一步研判。"
-        );
-
-        map.put("{{REPORT_TO}}", hasText(request.reportTo()) ? request.reportTo() : "XXXXX");
-        map.put("{{SEND_TO}}", hasText(request.sendTo()) ? request.sendTo() : "XXXXX");
-        map.put("{{CONTACT_INFO}}", hasText(request.contactInfo()) ? request.contactInfo() : "XXX   XXXXXXXX");
-
-        return map;
-    }
-
-    /**
-     * 处理正文栏目：
-     * {{SECTION_NATIONAL}}
-     * {{SECTION_PROVINCIAL}}
-     *
-     * 标题：仿宋_GB2312、三号、加粗
-     * 正文：仿宋_GB2312、三号、不加粗
-     */
-    private void replaceSectionPlaceholdersWithFormattedRuns(
-            XWPFDocument document,
-            Map<String, String> placeholders
-    ) {
-        replaceOneSectionPlaceholder(document, placeholders, "{{SECTION_NATIONAL}}");
-        replaceOneSectionPlaceholder(document, placeholders, "{{SECTION_PROVINCIAL}}");
-
-        placeholders.remove("{{SECTION_NATIONAL}}");
-        placeholders.remove("{{SECTION_PROVINCIAL}}");
-    }
-
-    private void replaceOneSectionPlaceholder(
-            XWPFDocument document,
-            Map<String, String> placeholders,
-            String placeholder
-    ) {
-        String sectionText = placeholders.get(placeholder);
-
-        if (!hasText(sectionText)) {
-            return;
+        if (request.issueNo() == null || request.totalIssueNo() == null) {
+            throw new IllegalArgumentException("期号和总期号不能为空");
         }
 
-        for (XWPFParagraph paragraph : document.getParagraphs()) {
-            String text = paragraph.getText();
+        Map<String, String> values = new LinkedHashMap<>();
+        values.put("{{REPORT_YEAR}}", String.valueOf(report.getReportYear()));
+        values.put("{{ISSUE_NO}}", String.valueOf(request.issueNo()));
+        values.put("{{TOTAL_ISSUE_NO}}", String.valueOf(request.totalIssueNo()));
+        values.put("{{REPORT_MONTH}}", report.getReportYear() + "年" + report.getReportMonth() + "月");
 
-            if (text != null && text.contains(placeholder)) {
-                replaceParagraphWithFormattedSectionRuns(paragraph, sectionText);
-                return;
-            }
+        values.put("{{KEY_POINTS_NATIONAL}}", keyPoints(itemsBySection.get("NATIONAL")));
+        values.put("{{KEY_POINTS_PROVINCIAL}}", keyPoints(itemsBySection.get("PROVINCIAL")));
+        values.put("{{KEY_POINTS_PIONEER}}", keyPoints(mergePioneerItems(itemsBySection)));
+        values.put("{{KEY_POINTS_CASE}}", keyPoints(itemsBySection.get("CASE")));
+        values.put("{{KEY_POINTS_TREND}}", keyPoints(itemsBySection.get("TREND")));
+
+        values.put("{{SECTION_NATIONAL}}", sectionContent(itemsBySection.get("NATIONAL")));
+        values.put("{{SECTION_PROVINCIAL}}", sectionContent(itemsBySection.get("PROVINCIAL")));
+        values.put("{{SECTION_PIONEER_OVERALL}}", sectionContent(itemsBySection.get("PIONEER_OVERALL")));
+        values.put("{{SECTION_PIONEER_INDICATORS}}", sectionContent(itemsBySection.get("PIONEER_INDICATORS")));
+        values.put("{{SECTION_PIONEER_SUPPORT}}", sectionContent(itemsBySection.get("PIONEER_SUPPORT")));
+        values.put("{{SECTION_PIONEER_EXPERIENCE}}", sectionContent(itemsBySection.get("PIONEER_EXPERIENCE")));
+        values.put("{{SECTION_CASE}}", sectionContent(itemsBySection.get("CASE")));
+        values.put("{{SECTION_TREND}}", sectionContent(itemsBySection.get("TREND")));
+
+        values.put("{{REPORT_TO}}", requireText(request.reportTo(), "报送单位"));
+        values.put("{{SEND_TO}}", requireText(request.sendTo(), "抄送单位"));
+        values.put("{{CONTACT_INFO}}", requireText(request.contactInfo(), "联系人及联系方式"));
+        return values;
+    }
+
+    private byte[] fillTemplate(Map<String, String> placeholders) {
+        try (InputStream input = new ClassPathResource(TEMPLATE_PATH).getInputStream();
+             XWPFDocument document = new XWPFDocument(input);
+             ByteArrayOutputStream output = new ByteArrayOutputStream()) {
+
+            removeWritingGuideParagraphs(document);
+            replacePlaceholders(document, placeholders);
+            assertNoPlaceholders(document);
+            document.getProperties().getCoreProperties().setTitle("山东省人工智能赋能制造业工作月报");
+            document.getProperties().getCoreProperties().setCreator("Policy Monthly Report Agent");
+            document.write(output);
+            return output.toByteArray();
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            throw new RuntimeException("Word 模板填充失败：" + e.getMessage(), e);
         }
+    }
 
-        for (XWPFTable table : document.getTables()) {
-            if (replaceSectionPlaceholderInTable(table, placeholder, sectionText)) {
-                return;
+    private void removeWritingGuideParagraphs(XWPFDocument document) {
+        for (int index = document.getBodyElements().size() - 1; index >= 0; index--) {
+            IBodyElement element = document.getBodyElements().get(index);
+            if (element instanceof XWPFParagraph paragraph && isWritingGuide(paragraph.getText())) {
+                document.removeBodyElement(index);
             }
         }
     }
 
-    private boolean replaceSectionPlaceholderInTable(
-            XWPFTable table,
-            String placeholder,
-            String sectionText
-    ) {
+    private boolean isWritingGuide(String text) {
+        if (!hasText(text)) {
+            return false;
+        }
+        String normalized = text.trim();
+        if (normalized.contains("{{") || normalized.contains("}}")) {
+            return false;
+        }
+        return normalized.startsWith("【栏目定位】")
+                || normalized.startsWith("【内容来源】")
+                || normalized.startsWith("【写作格式】")
+                || normalized.startsWith("【预期内容】")
+                || normalized.startsWith("【案例选取原则】")
+                || normalized.startsWith("【填报说明】")
+                || (normalized.startsWith("（") && normalized.endsWith("）"))
+                || (normalized.startsWith("(") && normalized.endsWith(")"));
+    }
+
+    private void replacePlaceholders(XWPFDocument document, Map<String, String> placeholders) {
+        document.getParagraphs().forEach(paragraph -> replaceInParagraph(paragraph, placeholders));
+        document.getTables().forEach(table -> replaceInTable(table, placeholders));
+        document.getHeaderList().forEach(header -> {
+            header.getParagraphs().forEach(paragraph -> replaceInParagraph(paragraph, placeholders));
+            header.getTables().forEach(table -> replaceInTable(table, placeholders));
+        });
+        document.getFooterList().forEach(footer -> {
+            footer.getParagraphs().forEach(paragraph -> replaceInParagraph(paragraph, placeholders));
+            footer.getTables().forEach(table -> replaceInTable(table, placeholders));
+        });
+    }
+
+    private void replaceInTable(XWPFTable table, Map<String, String> placeholders) {
         for (XWPFTableRow row : table.getRows()) {
             for (XWPFTableCell cell : row.getTableCells()) {
-                for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                    String text = paragraph.getText();
-
-                    if (text != null && text.contains(placeholder)) {
-                        replaceParagraphWithFormattedSectionRuns(paragraph, sectionText);
-                        return true;
-                    }
-                }
-
-                for (XWPFTable nestedTable : cell.getTables()) {
-                    if (replaceSectionPlaceholderInTable(nestedTable, placeholder, sectionText)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private void replaceParagraphWithFormattedSectionRuns(
-            XWPFParagraph paragraph,
-            String sectionText
-    ) {
-        clearParagraph(paragraph);
-
-        List<SectionItem> items = parseSectionItems(sectionText);
-
-        if (items.isEmpty()) {
-            XWPFRun run = createNormalRun(paragraph);
-            replaceRunTextWithBreaks(run, sectionText);
-            return;
-        }
-
-        // 不依赖 Word 的首行缩进，改为用全角空格控制每条标题和正文缩进
-        paragraph.setFirstLineIndent(0);
-        paragraph.setIndentationLeft(0);
-        paragraph.setSpacingAfter(120);
-
-        for (int i = 0; i < items.size(); i++) {
-            SectionItem item = items.get(i);
-
-            // 标题：两个全角空格 + 编号标题
-            XWPFRun titleRun = createTitleRun(paragraph);
-            titleRun.setText(item.title());
-            titleRun.addBreak();
-
-            // 正文：两个全角空格 + 正文
-            XWPFRun bodyRun = createNormalRun(paragraph);
-            String body = hasText(item.body()) ? item.body() : "材料未明确。";
-            replaceRunTextWithBreaks(bodyRun, "　　" + body);
-
-            if (i < items.size() - 1) {
-                bodyRun.addBreak();
-                bodyRun.addBreak();
+                cell.getParagraphs().forEach(paragraph -> replaceInParagraph(paragraph, placeholders));
+                cell.getTables().forEach(nested -> replaceInTable(nested, placeholders));
             }
         }
     }
 
-    /**
-     * 处理“本期要目”项目符号：
-     * {{KEY_POINTS_NATIONAL}}
-     * {{KEY_POINTS_PROVINCIAL}}
-     * {{KEY_POINTS_PIONEER}}
-     * {{KEY_POINTS_CASE}}
-     * {{KEY_POINTS_TREND}}
-     *
-     * 输出格式：
-     * ● xxxx
-     * ● xxxx
-     */
-    private void replaceKeyPointPlaceholdersWithBullets(
-            XWPFDocument document,
-            Map<String, String> placeholders
-    ) {
-        replaceOneKeyPointPlaceholder(document, placeholders, "{{KEY_POINTS_NATIONAL}}");
-        replaceOneKeyPointPlaceholder(document, placeholders, "{{KEY_POINTS_PROVINCIAL}}");
-        replaceOneKeyPointPlaceholder(document, placeholders, "{{KEY_POINTS_PIONEER}}");
-        replaceOneKeyPointPlaceholder(document, placeholders, "{{KEY_POINTS_CASE}}");
-        replaceOneKeyPointPlaceholder(document, placeholders, "{{KEY_POINTS_TREND}}");
-
-        placeholders.remove("{{KEY_POINTS_NATIONAL}}");
-        placeholders.remove("{{KEY_POINTS_PROVINCIAL}}");
-        placeholders.remove("{{KEY_POINTS_PIONEER}}");
-        placeholders.remove("{{KEY_POINTS_CASE}}");
-        placeholders.remove("{{KEY_POINTS_TREND}}");
-    }
-
-    private void replaceOneKeyPointPlaceholder(
-            XWPFDocument document,
-            Map<String, String> placeholders,
-            String placeholder
-    ) {
-        String keyPointText = placeholders.get(placeholder);
-
-        if (!hasText(keyPointText)) {
-            return;
-        }
-
-        for (XWPFParagraph paragraph : document.getParagraphs()) {
-            String text = paragraph.getText();
-
-            if (text != null && text.contains(placeholder)) {
-                replaceParagraphWithBulletRuns(paragraph, keyPointText);
-                return;
-            }
-        }
-
-        for (XWPFTable table : document.getTables()) {
-            if (replaceKeyPointPlaceholderInTable(table, placeholder, keyPointText)) {
-                return;
-            }
-        }
-    }
-
-    private boolean replaceKeyPointPlaceholderInTable(
-            XWPFTable table,
-            String placeholder,
-            String keyPointText
-    ) {
-        for (XWPFTableRow row : table.getRows()) {
-            for (XWPFTableCell cell : row.getTableCells()) {
-                for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                    String text = paragraph.getText();
-
-                    if (text != null && text.contains(placeholder)) {
-                        replaceParagraphWithBulletRuns(paragraph, keyPointText);
-                        return true;
-                    }
-                }
-
-                for (XWPFTable nestedTable : cell.getTables()) {
-                    if (replaceKeyPointPlaceholderInTable(nestedTable, placeholder, keyPointText)) {
-                        return true;
-                    }
-                }
-            }
-        }
-
-        return false;
-    }
-
-    private void replaceParagraphWithBulletRuns(
-            XWPFParagraph paragraph,
-            String keyPointText
-    ) {
-        clearParagraph(paragraph);
-
-        List<String> items = parseKeyPointItems(keyPointText);
-
-        if (items.isEmpty()) {
-            XWPFRun run = createNormalRun(paragraph);
-            replaceRunTextWithBreaks(run, "● " + keyPointText.trim());
-            return;
-        }
-
-        paragraph.setFirstLineIndent(0);
-        paragraph.setSpacingAfter(80);
-
-        XWPFRun run = createNormalRun(paragraph);
-
-        for (int i = 0; i < items.size(); i++) {
-            String item = items.get(i);
-            run.setText("● " + item);
-
-            if (i < items.size() - 1) {
-                run.addBreak();
-            }
-        }
-    }
-
-    private List<String> parseKeyPointItems(String keyPointText) {
-        List<String> items = new ArrayList<>();
-
-        if (!hasText(keyPointText)) {
-            return items;
-        }
-
-        String[] lines = keyPointText.replace("\r", "").split("\n");
-
-        for (String rawLine : lines) {
-            String line = rawLine == null ? "" : rawLine.trim();
-
-            if (line.isBlank()) {
+    private void replaceInParagraph(XWPFParagraph paragraph, Map<String, String> placeholders) {
+        for (XWPFRun run : paragraph.getRuns()) {
+            String current = run.getText(0);
+            if (current == null) {
                 continue;
             }
-
-            // 去掉模型可能生成的前导符号
-            line = line.replaceFirst("^[·•●]\\s*", "");
-            line = line.replaceFirst("^[-*]\\s*", "");
-            line = line.trim();
-
-            if (!line.isBlank()) {
-                items.add(line);
-            }
-        }
-
-        return items;
-    }
-
-    private List<SectionItem> parseSectionItems(String sectionText) {
-        List<SectionItem> items = new ArrayList<>();
-
-        if (!hasText(sectionText)) {
-            return items;
-        }
-
-        String[] lines = sectionText.replace("\r", "").split("\n");
-
-        String currentTitle = null;
-        StringBuilder currentBody = new StringBuilder();
-
-        for (String rawLine : lines) {
-            String line = rawLine == null ? "" : rawLine.trim();
-
-            if (line.isBlank()) {
-                continue;
-            }
-
-            if (isNumberedTitle(line)) {
-                if (currentTitle != null) {
-                    items.add(new SectionItem(currentTitle, currentBody.toString().trim()));
-                }
-
-                currentTitle = line;
-                currentBody = new StringBuilder();
-            } else {
-                if (currentTitle == null) {
-                    currentTitle = line;
-                } else {
-                    if (!currentBody.isEmpty()) {
-                        currentBody.append("\n");
-                    }
-                    currentBody.append(line);
-                }
-            }
-        }
-
-        if (currentTitle != null) {
-            items.add(new SectionItem(currentTitle, currentBody.toString().trim()));
-        }
-
-        return items;
-    }
-
-    private boolean isNumberedTitle(String line) {
-        return line != null && line.trim().matches("^\\d+[\\.、．].+");
-    }
-
-    /**
-     * 普通占位符替换：
-     * 只替换文字 Run，不删除段落，不重建段落，避免破坏模板中的图片横线。
-     */
-    private void replaceNormalPlaceholders(XWPFDocument document, Map<String, String> placeholders) {
-        for (XWPFParagraph paragraph : document.getParagraphs()) {
-            replaceNormalPlaceholdersInParagraph(paragraph, placeholders);
-        }
-
-        for (XWPFTable table : document.getTables()) {
-            replaceNormalPlaceholdersInTable(table, placeholders);
-        }
-    }
-
-    private void replaceNormalPlaceholdersInTable(XWPFTable table, Map<String, String> placeholders) {
-        for (XWPFTableRow row : table.getRows()) {
-            for (XWPFTableCell cell : row.getTableCells()) {
-                for (XWPFParagraph paragraph : cell.getParagraphs()) {
-                    replaceNormalPlaceholdersInParagraph(paragraph, placeholders);
-                }
-
-                for (XWPFTable nestedTable : cell.getTables()) {
-                    replaceNormalPlaceholdersInTable(nestedTable, placeholders);
-                }
-            }
-        }
-    }
-
-    private void replaceNormalPlaceholdersInParagraph(
-            XWPFParagraph paragraph,
-            Map<String, String> placeholders
-    ) {
-        List<XWPFRun> runs = paragraph.getRuns();
-
-        if (runs == null || runs.isEmpty()) {
-            return;
-        }
-
-        for (XWPFRun run : runs) {
-            String text = run.getText(0);
-
-            if (!hasText(text)) {
-                continue;
-            }
-
-            String replacedText = text;
-
+            String replacement = current;
             for (Map.Entry<String, String> entry : placeholders.entrySet()) {
-                replacedText = replacedText.replace(entry.getKey(), entry.getValue());
+                replacement = replacement.replace(entry.getKey(), nullToEmpty(entry.getValue()));
             }
-
-            if (!replacedText.equals(text)) {
-                replaceRunTextWithBreaks(run, replacedText);
+            if (!replacement.equals(current)) {
+                setRunText(run, replacement);
             }
         }
     }
 
-    private void replaceRunTextWithBreaks(XWPFRun run, String text) {
-        if (text == null) {
-            run.setText("", 0);
-            return;
-        }
-
-        String[] lines = text.split("\\R", -1);
-
-        if (lines.length == 0) {
-            run.setText("", 0);
-            return;
-        }
-
-        run.setText(lines[0], 0);
-
-        for (int i = 1; i < lines.length; i++) {
+    private void setRunText(XWPFRun run, String value) {
+        String[] lines = nullToEmpty(value).split("\\R", -1);
+        run.setText(lines.length == 0 ? "" : lines[0], 0);
+        for (int index = 1; index < lines.length; index++) {
             run.addBreak();
-            run.setText(lines[i]);
+            run.setText(lines[index]);
         }
     }
 
-    private void clearParagraph(XWPFParagraph paragraph) {
-        List<XWPFRun> runs = paragraph.getRuns();
-
-        if (runs == null) {
-            return;
+    private void assertNoPlaceholders(XWPFDocument document) {
+        List<String> remaining = new ArrayList<>();
+        document.getParagraphs().forEach(p -> collectPlaceholder(p.getText(), remaining));
+        document.getTables().forEach(t -> collectTablePlaceholders(t, remaining));
+        document.getHeaderList().forEach(h -> h.getParagraphs().forEach(p -> collectPlaceholder(p.getText(), remaining)));
+        document.getFooterList().forEach(f -> f.getParagraphs().forEach(p -> collectPlaceholder(p.getText(), remaining)));
+        if (!remaining.isEmpty()) {
+            throw new IllegalArgumentException("模板仍有未填充占位符：" + String.join(", ", remaining));
         }
+    }
 
-        for (int i = runs.size() - 1; i >= 0; i--) {
-            paragraph.removeRun(i);
+    private void collectTablePlaceholders(XWPFTable table, List<String> remaining) {
+        for (XWPFTableRow row : table.getRows()) {
+            for (XWPFTableCell cell : row.getTableCells()) {
+                collectPlaceholder(cell.getText(), remaining);
+                cell.getTables().forEach(nested -> collectTablePlaceholders(nested, remaining));
+            }
         }
     }
 
-    private XWPFRun createTitleRun(XWPFParagraph paragraph) {
-        XWPFRun run = paragraph.createRun();
-        run.setBold(true);
-        run.setFontFamily(FONT_FANGSONG_GB2312);
-        run.setFontSize(FONT_SIZE_THIRD);
-        return run;
+    private void collectPlaceholder(String text, List<String> remaining) {
+        if (text != null && text.contains("{{") && text.contains("}}")) {
+            remaining.add(text);
+        }
     }
 
-    private XWPFRun createNormalRun(XWPFParagraph paragraph) {
-        XWPFRun run = paragraph.createRun();
-        run.setBold(false);
-        run.setFontFamily(FONT_FANGSONG_GB2312);
-        run.setFontSize(FONT_SIZE_THIRD);
-        return run;
+    private List<MonthlyReportItem> mergePioneerItems(
+            Map<String, List<MonthlyReportItem>> itemsBySection
+    ) {
+        return List.of(
+                        "PIONEER_OVERALL",
+                        "PIONEER_INDICATORS",
+                        "PIONEER_SUPPORT",
+                        "PIONEER_EXPERIENCE"
+                ).stream()
+                .flatMap(code -> itemsBySection.getOrDefault(code, List.of()).stream())
+                .toList();
     }
 
-    private boolean isNationalPolicy(PolicyDocument document) {
-        String sourceName = safe(document.getSourceName());
-        String sourceUrl = safe(document.getSourceUrl());
-        String category = safe(document.getCategory());
-
-        return category.contains("国家")
-                || category.contains("国家重点事项")
-                || sourceName.contains("国务院")
-                || sourceName.contains("工业和信息化部")
-                || sourceName.contains("国家发展改革委")
-                || sourceName.contains("国家数据局")
-                || sourceName.contains("国家互联网信息办公室")
-                || sourceName.contains("国家网信办")
-                || sourceUrl.contains("miit.gov.cn")
-                || sourceUrl.contains("ndrc.gov.cn")
-                || sourceUrl.contains("nda.gov.cn")
-                || sourceUrl.contains("cac.gov.cn");
+    private void validateSectionMappings(Map<String, List<MonthlyReportItem>> itemsBySection) {
+        List<String> unsupportedSectionCodes = itemsBySection.keySet().stream()
+                .filter(code -> !CONTENT_SECTION_CODES.contains(code))
+                .toList();
+        if (!unsupportedSectionCodes.isEmpty()) {
+            throw new IllegalArgumentException("存在无法映射到 Word 插槽的栏目：" + unsupportedSectionCodes);
+        }
     }
 
-    private boolean isProvincialPolicy(PolicyDocument document) {
-        String sourceName = safe(document.getSourceName());
-        String sourceUrl = safe(document.getSourceUrl());
-        String category = safe(document.getCategory());
-
-        return category.contains("省内")
-                || category.contains("山东")
-                || category.contains("省内工作推进")
-                || sourceName.contains("山东")
-                || sourceUrl.contains("shandong.gov.cn")
-                || sourceUrl.contains("gxt.shandong.gov.cn");
+    private String keyPoints(List<MonthlyReportItem> items) {
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+        return items.stream()
+                .map(item -> "● " + requireText(item.getItemTitle(), "本期要目标题"))
+                .collect(Collectors.joining("\n"));
     }
 
-    private String safe(String value) {
-        return value == null || value.isBlank() ? "" : value.trim();
+    private String sectionContent(List<MonthlyReportItem> items) {
+        if (items == null || items.isEmpty()) {
+            return "";
+        }
+        StringBuilder content = new StringBuilder();
+        for (int index = 0; index < items.size(); index++) {
+            MonthlyReportItem item = items.get(index);
+            if (index > 0) {
+                content.append("\n\n");
+            }
+            content.append(index + 1)
+                    .append(".")
+                    .append(requireText(item.getItemTitle(), "月报内容标题"))
+                    .append("\n")
+                    .append(requireText(item.getFinalContent(), "月报最终内容"));
+        }
+        return content.toString();
+    }
+
+    private void validateConfirmedItems(List<MonthlyReportItem> items) {
+        for (MonthlyReportItem item : items) {
+            requireText(item.getItemTitle(), "月报内容标题");
+            requireText(item.getFinalContent(), "月报最终内容");
+        }
+    }
+
+    private void validateGenerationRequest(MonthlyReportGenerateRequest request) {
+        if (request.issueNo() == null || request.issueNo() < 1) {
+            throw new IllegalArgumentException("当年期号必须大于 0");
+        }
+        if (request.totalIssueNo() == null || request.totalIssueNo() < request.issueNo()) {
+            throw new IllegalArgumentException("总期号不能小于当年期号");
+        }
+        requireText(request.reportTo(), "报送单位");
+        requireText(request.sendTo(), "抄送单位");
+        requireText(request.contactInfo(), "联系人及联系方式");
+        requireText(request.generatedBy(), "生成操作人");
+    }
+
+    private MonthlyReportGenerationResult resultOf(MonthlyReportGeneration generation) {
+        return new MonthlyReportGenerationResult(
+                generation.getId(),
+                generation.getReportId(),
+                generation.getGenerationNo(),
+                generation.getFileName(),
+                generation.getContentType(),
+                generation.getFileSize(),
+                generation.getSha256(),
+                generation.getFileContent()
+        );
+    }
+
+    private MonthlyReportGenerationView viewOf(MonthlyReportGeneration generation) {
+        return new MonthlyReportGenerationView(
+                generation.getId(),
+                generation.getReportId(),
+                generation.getGenerationNo(),
+                generation.getIssueNo(),
+                generation.getTotalIssueNo(),
+                generation.getReportMonth(),
+                generation.getReportTo(),
+                generation.getSendTo(),
+                generation.getContactInfo(),
+                generation.getGeneratedBy(),
+                generation.getFileName(),
+                generation.getFileSize(),
+                generation.getSha256(),
+                generation.getCreatedAt()
+        );
+    }
+
+    private String safeFileName(String value) {
+        String safe = requireText(value, "月报标题")
+                .replaceAll("[\\\\/:*?\"<>|]", "_")
+                .trim();
+        return safe.isEmpty() ? "人工智能政策月报" : safe;
+    }
+    private String requireText(String value, String fieldName) {
+        if (!hasText(value)) {
+            throw new IllegalArgumentException(fieldName + "不能为空");
+        }
+        return value.trim();
+    }
+
+    private String nullToEmpty(String value) {
+        return value == null ? "" : value;
     }
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
     }
 
-    private record SectionItem(String title, String body) {
+    private String sha256(byte[] content) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(content);
+            return HexFormat.of().formatHex(digest);
+        } catch (Exception e) {
+            throw new IllegalStateException("无法计算 Word 文件哈希", e);
+        }
     }
 }

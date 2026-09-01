@@ -1,11 +1,11 @@
 package com.itheima.policydailyagent.dto;
 
 public record ReviewTaskSummary(
-        Long taskId,
+        Long searchTaskId,
         long totalCount,
         long pendingCount,
-        long approvedCount,
+        long acceptedCount,
         long rejectedCount,
-        long needsEditCount
+        long deferredCount
 ) {
 }

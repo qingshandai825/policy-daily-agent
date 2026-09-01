@@ -1,9 +1,11 @@
 package com.itheima.policydailyagent.service;
 
 import com.itheima.policydailyagent.dto.*;
-import com.itheima.policydailyagent.entity.DailyTask;
+import com.itheima.policydailyagent.domain.search.SearchTask;
+import com.itheima.policydailyagent.domain.search.SearchTaskPolicy;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
+import com.itheima.policydailyagent.repository.SearchTaskPolicyRepository;
 import com.itheima.policydailyagent.dto.PolicyLinkPreviewResult;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -25,24 +27,24 @@ public class PolicyDiscoveryService {
 
     private final PolicyCrawlerService policyCrawlerService;
     private final PolicyDocumentService policyDocumentService;
-    private final PolicySummaryService policySummaryService;
     private final PolicyDocumentRepository policyDocumentRepository;
-    private final DailyTaskService dailyTaskService;
+    private final SearchTaskPolicyRepository searchTaskPolicyRepository;
+    private final SearchTaskService searchTaskService;
     private final PolicyDateFilterService policyDateFilterService;
 
     public PolicyDiscoveryService(
             PolicyCrawlerService policyCrawlerService,
             PolicyDocumentService policyDocumentService,
-            PolicySummaryService policySummaryService,
             PolicyDocumentRepository policyDocumentRepository,
-            DailyTaskService dailyTaskService,
+            SearchTaskPolicyRepository searchTaskPolicyRepository,
+            SearchTaskService searchTaskService,
             PolicyDateFilterService policyDateFilterService
     ) {
         this.policyCrawlerService = policyCrawlerService;
         this.policyDocumentService = policyDocumentService;
-        this.policySummaryService = policySummaryService;
         this.policyDocumentRepository = policyDocumentRepository;
-        this.dailyTaskService = dailyTaskService;
+        this.searchTaskPolicyRepository = searchTaskPolicyRepository;
+        this.searchTaskService = searchTaskService;
         this.policyDateFilterService = policyDateFilterService;
     }
 
@@ -60,31 +62,39 @@ public class PolicyDiscoveryService {
                 ? DEFAULT_MAX_LINKS
                 : request.maxLinks();
 
-        boolean autoSummarize = Boolean.TRUE.equals(request.autoSummarize());
-        DailyTask dailyTask = dailyTaskService.createAndStart(request, keywords);
+        SearchTask searchTask = searchTaskService.createAndStart(request, keywords);
 
-        List<CandidateLink> candidateLinks = discoverLinks(
-                request.listPageUrl(),
-                keywords,
-                maxLinks
-        );
+        List<CandidateLink> candidateLinks;
+        try {
+            candidateLinks = discoverLinks(
+                    request.listPageUrl(),
+                    keywords,
+                    maxLinks
+            );
+        } catch (RuntimeException e) {
+            searchTaskService.fail(searchTask.getId(), 0, 1, e.getMessage());
+            throw e;
+        }
 
         int savedCount = 0;
         int duplicateCount = 0;
         int filteredCount = 0;
         int failedCount = 0;
-        int summarizedCount = 0;
 
         List<String> savedTitles = new ArrayList<>();
         List<String> duplicateUrls = new ArrayList<>();
         List<String> filteredMessages = new ArrayList<>();
         List<String> failedMessages = new ArrayList<>();
 
+        int discoveryOrder = 0;
         for (CandidateLink candidateLink : candidateLinks) {
+            discoveryOrder++;
             String url = candidateLink.url();
 
             try {
-                if (policyDocumentRepository.existsBySourceUrl(url)) {
+                var existingByUrl = policyDocumentRepository.findBySourceUrl(url);
+                if (existingByUrl.isPresent()) {
+                    associate(searchTask, candidateLink, existingByUrl.get(), discoveryOrder);
                     duplicateCount++;
                     duplicateUrls.add(url);
                     continue;
@@ -103,11 +113,14 @@ public class PolicyDiscoveryService {
                     continue;
                 }
 
-                if (hasText(crawlResult.contentHash())
-                        && policyDocumentRepository.existsByContentHash(crawlResult.contentHash())) {
-                    duplicateCount++;
-                    duplicateUrls.add(url + " duplicate content hash");
-                    continue;
+                if (hasText(crawlResult.contentHash())) {
+                    var existingByHash = policyDocumentRepository.findFirstByContentHash(crawlResult.contentHash());
+                    if (existingByHash.isPresent()) {
+                        associate(searchTask, candidateLink, existingByHash.get(), discoveryOrder);
+                        duplicateCount++;
+                        duplicateUrls.add(url + " duplicate content hash");
+                        continue;
+                    }
                 }
 
                 PolicyDocumentCreateRequest createRequest = new PolicyDocumentCreateRequest(
@@ -117,7 +130,7 @@ public class PolicyDiscoveryService {
                         crawlResult.sourceUrl(),
                         crawlResult.content(),
                         inferCategory(crawlResult.sourceName(), crawlResult.sourceUrl()),
-                        dailyTask.getId(),
+                        searchTask.getId(),
                         crawlResult.retrievedAt(),
                         crawlResult.sourceDomain(),
                         crawlResult.sourceType(),
@@ -128,18 +141,18 @@ public class PolicyDiscoveryService {
                         crawlResult.contentHash(),
                         crawlResult.evidenceSnippet(),
                         filterResult.status(),
-                        filterResult.reason()
+                        filterResult.reason(),
+                        crawlResult.cleanedContent(),
+                        crawlResult.contentCompleteness(),
+                        crawlResult.contentQualityReason(),
+                        crawlResult.attachments()
                 );
 
                 PolicyDocument savedDocument = policyDocumentService.createPolicyDocument(createRequest);
+                associate(searchTask, candidateLink, savedDocument, discoveryOrder);
 
                 savedCount++;
                 savedTitles.add(savedDocument.getTitle());
-
-                if (autoSummarize) {
-                    policySummaryService.summarizeById(savedDocument.getId());
-                    summarizedCount++;
-                }
 
             } catch (Exception e) {
                 failedCount++;
@@ -147,24 +160,22 @@ public class PolicyDiscoveryService {
             }
         }
 
-        dailyTaskService.complete(
-                dailyTask.getId(),
+        searchTaskService.complete(
+                searchTask.getId(),
                 candidateLinks.size(),
                 savedCount,
                 duplicateCount,
                 filteredCount,
-                failedCount,
-                summarizedCount
+                failedCount
         );
 
         return new PolicyDiscoverResult(
-                dailyTask.getId(),
+                searchTask.getId(),
                 candidateLinks.size(),
                 savedCount,
                 duplicateCount,
                 filteredCount,
                 failedCount,
-                summarizedCount,
                 savedTitles,
                 duplicateUrls,
                 filteredMessages,
@@ -370,6 +381,24 @@ public class PolicyDiscoveryService {
         return value != null && !value.trim().isEmpty();
     }
 
+    private void associate(
+            SearchTask searchTask,
+            CandidateLink candidateLink,
+            PolicyDocument document,
+            int discoveryOrder
+    ) {
+        if (searchTaskPolicyRepository.existsBySearchTaskIdAndPolicyId(searchTask.getId(), document.getId())) {
+            return;
+        }
+        SearchTaskPolicy association = new SearchTaskPolicy();
+        association.setSearchTaskId(searchTask.getId());
+        association.setPolicyId(document.getId());
+        association.setProvider("DIRECT_LIST");
+        association.setDiscoveredUrl(candidateLink.url());
+        association.setDiscoveredTitle(candidateLink.text());
+        association.setDiscoveryOrder(discoveryOrder);
+        searchTaskPolicyRepository.save(association);
+    }
     private record CandidateLink(String url, String text) {
     }
 

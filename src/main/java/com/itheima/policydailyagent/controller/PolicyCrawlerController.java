@@ -48,7 +48,7 @@ public class PolicyCrawlerController {
                     crawlResult.publishDate(),
                     crawlResult.sourceUrl(),
                     crawlResult.content(),
-                    "????",
+                    "\u653F\u7B56\u6750\u6599",
                     null,
                     crawlResult.retrievedAt(),
                     crawlResult.sourceDomain(),
@@ -60,7 +60,11 @@ public class PolicyCrawlerController {
                     crawlResult.contentHash(),
                     crawlResult.evidenceSnippet(),
                     "ACCEPTED",
-                    "Manual URL fetch."
+                    "Manual URL fetch.",
+                    crawlResult.cleanedContent(),
+                    crawlResult.contentCompleteness(),
+                    crawlResult.contentQualityReason(),
+                    crawlResult.attachments()
             );
 
             PolicyDocument savedDocument = policyDocumentService.createPolicyDocument(createRequest);

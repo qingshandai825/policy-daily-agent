@@ -16,14 +16,15 @@ class PolicyDiscoverRequestTests {
                 "https://example.gov.cn/list",
                 List.of("人工智能"),
                 10,
-                false,
                 null,
                 date,
-                "日报任务"
+                "月报候选检索",
+                "2026-08"
         );
 
         assertThat(request.resolvedTargetStartDate()).isEqualTo(date);
         assertThat(request.resolvedTargetEndDate()).isEqualTo(date);
+        assertThat(request.reportMonth()).isEqualTo("2026-08");
     }
 
     @Test
@@ -32,10 +33,10 @@ class PolicyDiscoverRequestTests {
                 "https://example.gov.cn/list",
                 List.of(),
                 10,
-                false,
                 null,
                 null,
-                "日报任务"
+                "月报候选检索",
+                null
         );
 
         assertThat(request.resolvedTargetStartDate()).isEqualTo(LocalDate.now());

@@ -35,8 +35,8 @@ public class PolicyDocumentController {
         return ResponseEntity.ok(policyDocumentService.listRecentPolicies());
     }
 
-    @GetMapping("/task/{taskId}")
-    public ResponseEntity<List<PolicyDocument>> listPoliciesByTaskId(@PathVariable Long taskId) {
-        return ResponseEntity.ok(policyDocumentService.listPoliciesByTaskId(taskId));
+    @GetMapping("/search-task/{taskId}")
+    public ResponseEntity<List<PolicyDocument>> listPoliciesBySearchTaskId(@PathVariable Long taskId) {
+        return ResponseEntity.ok(policyDocumentService.listPoliciesBySearchTaskId(taskId));
     }
 }

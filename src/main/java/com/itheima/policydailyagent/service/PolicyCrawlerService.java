@@ -23,6 +23,12 @@ public class PolicyCrawlerService {
 
     private static final int MAX_CONTENT_LENGTH = 12000;
 
+    private final PolicyAttachmentCrawlerService attachmentCrawlerService;
+
+    public PolicyCrawlerService(PolicyAttachmentCrawlerService attachmentCrawlerService) {
+        this.attachmentCrawlerService = attachmentCrawlerService;
+    }
+
     public PolicyCrawlResult crawl(String url) {
         if (url == null || url.isBlank()) {
             throw new IllegalArgumentException("政策网页链接不能为空");
@@ -46,6 +52,10 @@ public class PolicyCrawlerService {
                 throw new RuntimeException("No valid policy content was extracted.");
             }
 
+            PolicyAttachmentCrawlerService.AttachmentEnrichment enrichment =
+                    attachmentCrawlerService.enrich(document, url, content);
+            String cleanedContent = enrichment.cleanedContent();
+
             String sourceDomain = extractSourceDomain(url);
 
             return new PolicyCrawlResult(
@@ -61,8 +71,12 @@ public class PolicyCrawlerService {
                     publishDate == null ? "UNDETECTED" : "PAGE_METADATA_OR_TEXT",
                     publishDate == null ? "" : publishDate.toString(),
                     publishDate == null ? "NONE" : "MEDIUM",
-                    sha256(content),
-                    buildEvidenceSnippet(content)
+                    sha256(cleanedContent),
+                    buildEvidenceSnippet(cleanedContent),
+                    cleanedContent,
+                    enrichment.contentCompleteness(),
+                    enrichment.contentQualityReason(),
+                    enrichment.attachments()
             );
 
         } catch (RuntimeException e) {
@@ -159,11 +173,11 @@ public class PolicyCrawlerService {
             if (host.contains("nda.gov.cn")) {
                 return "国家数据局";
             }
-            if (host.contains("shandong.gov.cn")) {
-                return "山东省人民政府";
-            }
             if (host.contains("gxt.shandong.gov.cn")) {
                 return "山东省工业和信息化厅";
+            }
+            if (host.contains("shandong.gov.cn")) {
+                return "山东省人民政府";
             }
 
             return host;

@@ -1,8 +1,11 @@
 package com.itheima.policydailyagent.service;
 
+import com.itheima.policydailyagent.domain.policy.PolicyAnalysisStatus;
+import com.itheima.policydailyagent.domain.policy.PolicyReviewStatus;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -15,10 +18,10 @@ public class PolicySummaryService {
     private final PolicyDocumentRepository policyDocumentRepository;
 
     public PolicySummaryService(
-            ChatModel chatModel,
+            ObjectProvider<ChatModel> chatModelProvider,
             PolicyDocumentRepository policyDocumentRepository
     ) {
-        this.chatModel = chatModel;
+        this.chatModel = chatModelProvider.getIfAvailable();
         this.policyDocumentRepository = policyDocumentRepository;
     }
 
@@ -27,15 +30,23 @@ public class PolicySummaryService {
         PolicyDocument document = policyDocumentRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("政策文档不存在，id=" + id));
 
+        if (document.getReviewStatus() != PolicyReviewStatus.ACCEPTED) {
+            throw new IllegalArgumentException(
+                    "只有人工审核状态为 ACCEPTED 的政策才允许进行 Agent 分析"
+            );
+        }
         if (document.getContent() == null || document.getContent().isBlank()) {
             throw new IllegalArgumentException("政策正文为空，无法生成摘要");
+        }
+        if (chatModel == null) {
+            throw new AgentUnavailableException("Agent 未启用，无法生成摘要");
         }
 
         String prompt = buildPrompt(document);
         String summary = chatModel.call(prompt);
 
         document.setSummary(summary);
-        document.setStatus("SUMMARIZED");
+        document.setAnalysisStatus(PolicyAnalysisStatus.ANALYZED);
 
         return policyDocumentRepository.save(document);
     }
@@ -48,7 +59,7 @@ public class PolicySummaryService {
         }
 
         return """
-                你是一名政策研究助理，请根据给定政策原文生成结构化日报摘要。
+                你是一名政策研究助理，请根据给定政策原文生成结构化月报候选分析。
 
                 要求：
                 1. 只能依据原文内容，不得编造原文没有的信息。

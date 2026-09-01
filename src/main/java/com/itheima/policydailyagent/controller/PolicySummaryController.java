@@ -1,7 +1,10 @@
 package com.itheima.policydailyagent.controller;
 
-import com.itheima.policydailyagent.entity.PolicyDocument;
-import com.itheima.policydailyagent.service.PolicySummaryService;
+import com.itheima.policydailyagent.dto.PolicyAnalysisRequest;
+import com.itheima.policydailyagent.service.AgentUnavailableException;
+import com.itheima.policydailyagent.service.PolicyAnalysisExecutionException;
+import com.itheima.policydailyagent.service.PolicyAnalysisWorkflowService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,21 +14,26 @@ import java.util.Map;
 @RequestMapping("/api/ai/policies")
 public class PolicySummaryController {
 
-    private final PolicySummaryService policySummaryService;
+    private final PolicyAnalysisWorkflowService analysisWorkflowService;
 
-    public PolicySummaryController(PolicySummaryService policySummaryService) {
-        this.policySummaryService = policySummaryService;
+    public PolicySummaryController(PolicyAnalysisWorkflowService analysisWorkflowService) {
+        this.analysisWorkflowService = analysisWorkflowService;
     }
 
     @PostMapping("/{id}/summary")
     public ResponseEntity<?> summarize(@PathVariable Long id) {
         try {
-            PolicyDocument document = policySummaryService.summarizeById(id);
-            return ResponseEntity.ok(document);
+            return ResponseEntity.ok(
+                    analysisWorkflowService.analyze(id, new PolicyAnalysisRequest("legacy-summary-api"))
+            );
+        } catch (AgentUnavailableException e) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(Map.of("message", e.getMessage()));
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.internalServerError().body(Map.of("message", "摘要生成失败：" + e.getMessage()));
+        } catch (PolicyAnalysisExecutionException e) {
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
+                    .body(Map.of("message", e.getMessage()));
         }
     }
 }

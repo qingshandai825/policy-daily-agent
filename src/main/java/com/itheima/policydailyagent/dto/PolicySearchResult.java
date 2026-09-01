@@ -14,7 +14,6 @@ public record PolicySearchResult(
 
         int failedCount,
 
-        int summarizedCount,
 
         List<SearchItem> items,
 

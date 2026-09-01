@@ -36,22 +36,19 @@ public class QianfanAiSearchService {
     private Integer defaultMaxResults;
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final HttpClient httpClient = HttpClient.newHttpClient();
+    private volatile HttpClient httpClient;
 
     private final PolicyCrawlerService policyCrawlerService;
     private final PolicyDocumentService policyDocumentService;
-    private final PolicySummaryService policySummaryService;
     private final PolicyDateFilterService policyDateFilterService;
 
     public QianfanAiSearchService(
             PolicyCrawlerService policyCrawlerService,
             PolicyDocumentService policyDocumentService,
-            PolicySummaryService policySummaryService,
             PolicyDateFilterService policyDateFilterService
     ) {
         this.policyCrawlerService = policyCrawlerService;
         this.policyDocumentService = policyDocumentService;
-        this.policySummaryService = policySummaryService;
         this.policyDateFilterService = policyDateFilterService;
     }
 
@@ -90,7 +87,6 @@ public class QianfanAiSearchService {
                     0,
                     0,
                     0,
-                    0,
                     items,
                     List.of()
             );
@@ -101,22 +97,20 @@ public class QianfanAiSearchService {
     }
 
     /**
-     * 搜索并入库：搜索结果 -> 过滤 -> 抓取正文 -> 入库 -> 可选摘要。
+     * 搜索并入库：搜索结果 -> 过滤 -> 抓取正文 -> 候选池。搜索阶段不得触发深度分析。
      */
     public PolicySearchResult searchAndSave(
             String query,
             List<String> sites,
-            Integer maxResults,
-            Boolean autoSummarize
+            Integer maxResults
     ) {
-        return searchAndSave(query, sites, maxResults, autoSummarize, null, null);
+        return searchAndSave(query, sites, maxResults, null, null);
     }
 
     public PolicySearchResult searchAndSave(
             String query,
             List<String> sites,
             Integer maxResults,
-            Boolean autoSummarize,
             LocalDate targetStartDate,
             LocalDate targetEndDate
     ) {
@@ -125,7 +119,6 @@ public class QianfanAiSearchService {
         int savedCount = 0;
         int duplicateCount = 0;
         int failedCount = 0;
-        int summarizedCount = 0;
 
         List<SearchItem> savedItems = new ArrayList<>();
         List<String> failedMessages = new ArrayList<>();
@@ -181,18 +174,17 @@ public class QianfanAiSearchService {
                         crawlResult.contentHash(),
                         crawlResult.evidenceSnippet(),
                         filterResult.status(),
-                        filterResult.reason()
+                        filterResult.reason(),
+                        crawlResult.cleanedContent(),
+                        crawlResult.contentCompleteness(),
+                        crawlResult.contentQualityReason(),
+                        crawlResult.attachments()
                 );
 
                 PolicyDocument savedDocument = policyDocumentService.createPolicyDocument(createRequest);
 
                 savedCount++;
                 savedItems.add(item);
-
-                if (Boolean.TRUE.equals(autoSummarize)) {
-                    policySummaryService.summarizeById(savedDocument.getId());
-                    summarizedCount++;
-                }
 
             } catch (IllegalArgumentException e) {
                 duplicateCount++;
@@ -209,7 +201,6 @@ public class QianfanAiSearchService {
                 savedCount,
                 duplicateCount,
                 failedCount,
-                summarizedCount,
                 savedItems,
                 failedMessages
         );
@@ -227,7 +218,7 @@ public class QianfanAiSearchService {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        HttpResponse<String> response = httpClient.send(
+        HttpResponse<String> response = httpClient().send(
                 request,
                 HttpResponse.BodyHandlers.ofString()
         );
@@ -240,6 +231,19 @@ public class QianfanAiSearchService {
         }
 
         return response;
+    }
+
+    private HttpClient httpClient() {
+        HttpClient current = httpClient;
+        if (current != null) {
+            return current;
+        }
+        synchronized (this) {
+            if (httpClient == null) {
+                httpClient = HttpClient.newHttpClient();
+            }
+            return httpClient;
+        }
     }
 
     private String buildSearchPrompt(String query, List<String> sites, int maxResults) {

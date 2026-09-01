@@ -1,20 +1,29 @@
 package com.itheima.policydailyagent.service;
 
+import com.itheima.policydailyagent.domain.policy.AttachmentExtractionStatus;
+import com.itheima.policydailyagent.domain.policy.ContentCompleteness;
+import com.itheima.policydailyagent.dto.PolicyAttachmentCrawlResult;
 import com.itheima.policydailyagent.dto.PolicyDocumentCreateRequest;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import com.itheima.policydailyagent.repository.PolicyDocumentRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
 public class PolicyDocumentService {
 
     private final PolicyDocumentRepository policyDocumentRepository;
+    private final PolicyAttachmentPersistenceService attachmentPersistenceService;
 
-    public PolicyDocumentService(PolicyDocumentRepository policyDocumentRepository) {
+    public PolicyDocumentService(
+            PolicyDocumentRepository policyDocumentRepository,
+            PolicyAttachmentPersistenceService attachmentPersistenceService
+    ) {
         this.policyDocumentRepository = policyDocumentRepository;
+        this.attachmentPersistenceService = attachmentPersistenceService;
     }
 
     @Transactional
@@ -23,14 +32,21 @@ public class PolicyDocumentService {
             throw new IllegalArgumentException("该政策链接已存在，不能重复保存");
         }
 
+        List<PolicyAttachmentCrawlResult> attachments = request.attachments() == null
+                ? List.of()
+                : request.attachments();
+
         PolicyDocument document = new PolicyDocument();
         document.setTitle(request.title());
         document.setSourceName(request.sourceName());
         document.setPublishDate(request.publishDate());
         document.setSourceUrl(request.sourceUrl());
         document.setContent(request.content());
+        document.setCleanedContent(hasText(request.cleanedContent())
+                ? request.cleanedContent()
+                : request.content());
         document.setCategory(request.category());
-        document.setDailyTaskId(request.dailyTaskId());
+        document.setSearchTaskId(request.searchTaskId());
         document.setRetrievedAt(request.retrievedAt());
         document.setSourceDomain(request.sourceDomain());
         document.setSourceType(request.sourceType());
@@ -42,9 +58,21 @@ public class PolicyDocumentService {
         document.setEvidenceSnippet(request.evidenceSnippet());
         document.setFilterStatus(request.filterStatus());
         document.setFilterReason(request.filterReason());
-        document.setStatus("RAW");
+        document.setContentCompleteness(request.contentCompleteness() == null
+                ? ContentCompleteness.UNKNOWN
+                : request.contentCompleteness());
+        document.setContentQualityReason(request.contentQualityReason());
+        document.setAttachmentCount(attachments.size());
+        document.setExtractedAttachmentCount((int) attachments.stream()
+                .filter(item -> item.extractionStatus() == AttachmentExtractionStatus.SUCCEEDED)
+                .count());
+        document.setContentRefreshedAt(
+                request.retrievedAt() == null ? LocalDateTime.now() : request.retrievedAt()
+        );
 
-        return policyDocumentRepository.save(document);
+        PolicyDocument saved = policyDocumentRepository.save(document);
+        attachmentPersistenceService.upsert(saved.getId(), attachments);
+        return saved;
     }
 
     @Transactional(readOnly = true)
@@ -53,7 +81,11 @@ public class PolicyDocumentService {
     }
 
     @Transactional(readOnly = true)
-    public List<PolicyDocument> listPoliciesByTaskId(Long taskId) {
-        return policyDocumentRepository.findByDailyTaskIdOrderByPublishDateDescCreatedAtDesc(taskId);
+    public List<PolicyDocument> listPoliciesBySearchTaskId(Long taskId) {
+        return policyDocumentRepository.findBySearchTaskIdOrderByPublishDateDescCreatedAtDesc(taskId);
+    }
+
+    private boolean hasText(String value) {
+        return value != null && !value.trim().isEmpty();
     }
 }

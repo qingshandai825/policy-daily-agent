@@ -14,13 +14,13 @@ public record PolicyDiscoverRequest(
 
         Integer maxLinks,
 
-        Boolean autoSummarize,
-
         LocalDate targetStartDate,
 
         LocalDate targetEndDate,
 
-        String taskName
+        String taskName,
+
+        String reportMonth
 ) {
     public LocalDate resolvedTargetStartDate() {
         if (targetStartDate != null) {

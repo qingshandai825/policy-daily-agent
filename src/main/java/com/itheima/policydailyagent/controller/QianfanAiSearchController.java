@@ -5,7 +5,6 @@ import com.itheima.policydailyagent.service.QianfanAiSearchService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -54,61 +53,11 @@ public class QianfanAiSearchController {
     }
 
     @PostMapping("/qianfan-discover-and-save")
-    public ResponseEntity<?> qianfanDiscoverAndSave(@RequestBody Map<String, Object> request) {
-        try {
-            String query = String.valueOf(request.get("query"));
-
-            Integer maxResults = null;
-            if (request.get("maxResults") != null) {
-                maxResults = Integer.valueOf(String.valueOf(request.get("maxResults")));
-            }
-
-            Boolean autoSummarize = false;
-            if (request.get("autoSummarize") != null) {
-                autoSummarize = Boolean.valueOf(String.valueOf(request.get("autoSummarize")));
-            }
-
-            LocalDate targetStartDate = parseDate(request.get("targetStartDate"));
-            LocalDate targetEndDate = parseDate(request.get("targetEndDate"));
-
-            List<String> sites = List.of();
-
-            Object sitesObj = request.get("sites");
-            if (sitesObj instanceof List<?> rawList) {
-                sites = rawList.stream()
-                        .map(String::valueOf)
-                        .toList();
-            }
-
-            PolicySearchResult result = qianfanAiSearchService.searchAndSave(
-                    query,
-                    sites,
-                    maxResults,
-                    autoSummarize,
-                    targetStartDate,
-                    targetEndDate
-            );
-
-            return ResponseEntity.ok(result);
-
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
-        } catch (RuntimeException e) {
-            return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
-        }
+    public ResponseEntity<?> qianfanDiscoverAndSave() {
+        return ResponseEntity.badRequest().body(Map.of(
+                "message",
+                "该直写入口已停用。千帆仅用于搜索预览；候选入库请使用 /api/search-tasks/run，以确保搜索任务关联和人工审核链路完整。"
+        ));
     }
 
-
-    private LocalDate parseDate(Object value) {
-        if (value == null) {
-            return null;
-        }
-
-        String text = String.valueOf(value);
-        if (text.isBlank()) {
-            return null;
-        }
-
-        return LocalDate.parse(text);
-    }
 }

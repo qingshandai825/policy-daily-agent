@@ -1,5 +1,6 @@
 package com.itheima.policydailyagent.repository;
 
+import com.itheima.policydailyagent.domain.policy.PolicyReviewStatus;
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import org.springframework.data.jpa.repository.JpaRepository;
 
@@ -14,17 +15,21 @@ public interface PolicyDocumentRepository extends JpaRepository<PolicyDocument, 
 
     boolean existsByContentHash(String contentHash);
 
+    Optional<PolicyDocument> findFirstByContentHash(String contentHash);
+
     List<PolicyDocument> findTop20ByOrderByCreatedAtDesc();
 
-    List<PolicyDocument> findByDailyTaskIdOrderByPublishDateDescCreatedAtDesc(Long dailyTaskId);
+    List<PolicyDocument> findByReviewStatusOrderByPublishDateDescCreatedAtDesc(
+            PolicyReviewStatus reviewStatus);
 
-    List<PolicyDocument> findByDailyTaskIdAndReviewStatusOrderByPublishDateDescCreatedAtDesc(Long dailyTaskId, String reviewStatus);
+    List<PolicyDocument> findBySearchTaskIdOrderByPublishDateDescCreatedAtDesc(Long searchTaskId);
 
-    long countByDailyTaskId(Long dailyTaskId);
+    List<PolicyDocument> findBySearchTaskIdAndReviewStatusOrderByPublishDateDescCreatedAtDesc(
+            Long searchTaskId,
+            PolicyReviewStatus reviewStatus
+    );
 
-    long countByDailyTaskIdAndReviewStatus(Long dailyTaskId, String reviewStatus);
+    long countBySearchTaskId(Long searchTaskId);
 
-    List<PolicyDocument> findTop20ByStatusOrderByCreatedAtDesc(String status);
-
-    List<PolicyDocument> findTop20ByStatusOrderByPublishDateDescCreatedAtDesc(String status);
+    long countBySearchTaskIdAndReviewStatus(Long searchTaskId, PolicyReviewStatus reviewStatus);
 }

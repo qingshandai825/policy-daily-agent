@@ -1,10 +1,10 @@
 services:
   frontend:
     image: nginx:1.27-alpine
-    container_name: policy-daily-nginx
+    container_name: policy-monthly-report-nginx
     restart: unless-stopped
     ports:
-      - "${POLICY_DAILY_FRONTEND_PORT:-8081}:80"
+      - "${POLICY_MONTHLY_FRONTEND_PORT:-8081}:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro

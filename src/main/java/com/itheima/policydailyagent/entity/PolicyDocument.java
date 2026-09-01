@@ -1,10 +1,18 @@
 package com.itheima.policydailyagent.entity;
 
+import com.itheima.policydailyagent.domain.policy.ContentCompleteness;
+import com.itheima.policydailyagent.domain.policy.PolicyAnalysisStatus;
+import com.itheima.policydailyagent.domain.policy.PolicyReviewStatus;
 import jakarta.persistence.*;
+import lombok.Getter;
+import lombok.Setter;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+@Getter
+@Setter
 @Entity
 @Table(
         name = "policy_document",
@@ -49,6 +57,9 @@ public class PolicyDocument {
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "cleaned_content", columnDefinition = "TEXT")
+    private String cleanedContent;
+
     /**
      * 大模型生成的摘要
      */
@@ -61,11 +72,17 @@ public class PolicyDocument {
     @Column(name = "category", length = 100)
     private String category;
 
-    /**
-     * 处理状态：RAW、SUMMARIZED、WRITTEN
-     */
-    @Column(name = "daily_task_id")
-    private Long dailyTaskId;
+    @Column(name = "policy_type", length = 100)
+    private String policyType;
+
+    @Column(name = "keywords", columnDefinition = "TEXT")
+    private String keywords;
+
+    @Column(name = "relevance_score", precision = 5, scale = 2)
+    private BigDecimal relevanceScore;
+
+    @Column(name = "search_task_id")
+    private Long searchTaskId;
 
     @Column(name = "retrieved_at")
     private LocalDateTime retrievedAt;
@@ -94,14 +111,31 @@ public class PolicyDocument {
     @Column(name = "evidence_snippet", columnDefinition = "TEXT")
     private String evidenceSnippet;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "content_completeness", nullable = false, length = 30)
+    private ContentCompleteness contentCompleteness = ContentCompleteness.UNKNOWN;
+
+    @Column(name = "content_quality_reason", length = 1000)
+    private String contentQualityReason;
+
+    @Column(name = "attachment_count", nullable = false)
+    private Integer attachmentCount = 0;
+
+    @Column(name = "extracted_attachment_count", nullable = false)
+    private Integer extractedAttachmentCount = 0;
+
+    @Column(name = "content_refreshed_at")
+    private LocalDateTime contentRefreshedAt;
+
     @Column(name = "filter_status", length = 50)
     private String filterStatus;
 
     @Column(name = "filter_reason", length = 500)
     private String filterReason;
 
-    @Column(name = "review_status", length = 50)
-    private String reviewStatus = "PENDING_REVIEW";
+    @Enumerated(EnumType.STRING)
+    @Column(name = "review_status", nullable = false, length = 30)
+    private PolicyReviewStatus reviewStatus = PolicyReviewStatus.PENDING;
 
     @Column(name = "review_comment", length = 1000)
     private String reviewComment;
@@ -112,8 +146,9 @@ public class PolicyDocument {
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
-    @Column(name = "status", nullable = false, length = 50)
-    private String status = "RAW";
+    @Enumerated(EnumType.STRING)
+    @Column(name = "analysis_status", nullable = false, length = 30)
+    private PolicyAnalysisStatus analysisStatus = PolicyAnalysisStatus.NOT_ANALYZED;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -125,11 +160,11 @@ public class PolicyDocument {
     public void prePersist() {
         this.createdAt = LocalDateTime.now();
         this.updatedAt = LocalDateTime.now();
-        if (this.status == null) {
-            this.status = "RAW";
-        }
         if (this.reviewStatus == null) {
-            this.reviewStatus = "PENDING_REVIEW";
+            this.reviewStatus = PolicyReviewStatus.PENDING;
+        }
+        if (this.analysisStatus == null) {
+            this.analysisStatus = PolicyAnalysisStatus.NOT_ANALYZED;
         }
     }
 
@@ -170,12 +205,12 @@ public class PolicyDocument {
         return category;
     }
 
-    public String getStatus() {
-        return status;
+    public PolicyAnalysisStatus getAnalysisStatus() {
+        return analysisStatus;
     }
 
-    public Long getDailyTaskId() {
-        return dailyTaskId;
+    public Long getSearchTaskId() {
+        return searchTaskId;
     }
 
     public LocalDateTime getRetrievedAt() {
@@ -222,7 +257,7 @@ public class PolicyDocument {
         return filterReason;
     }
 
-    public String getReviewStatus() {
+    public PolicyReviewStatus getReviewStatus() {
         return reviewStatus;
     }
 
@@ -278,12 +313,12 @@ public class PolicyDocument {
         this.category = category;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setAnalysisStatus(PolicyAnalysisStatus analysisStatus) {
+        this.analysisStatus = analysisStatus;
     }
 
-    public void setDailyTaskId(Long dailyTaskId) {
-        this.dailyTaskId = dailyTaskId;
+    public void setSearchTaskId(Long searchTaskId) {
+        this.searchTaskId = searchTaskId;
     }
 
     public void setRetrievedAt(LocalDateTime retrievedAt) {
@@ -330,7 +365,7 @@ public class PolicyDocument {
         this.filterReason = filterReason;
     }
 
-    public void setReviewStatus(String reviewStatus) {
+    public void setReviewStatus(PolicyReviewStatus reviewStatus) {
         this.reviewStatus = reviewStatus;
     }
 

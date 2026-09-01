@@ -2,6 +2,7 @@ package com.itheima.policydailyagent.service;
 
 import com.itheima.policydailyagent.entity.PolicyDocument;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
@@ -14,8 +15,8 @@ public class MonthlyReportAiService {
 
     private final ChatModel chatModel;
 
-    public MonthlyReportAiService(ChatModel chatModel) {
-        this.chatModel = chatModel;
+    public MonthlyReportAiService(ObjectProvider<ChatModel> chatModelProvider) {
+        this.chatModel = chatModelProvider.getIfAvailable();
     }
 
     /**

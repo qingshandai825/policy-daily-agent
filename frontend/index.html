@@ -1,815 +1,161 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>政策日报审核台</title>
-  <style>
-    :root {
-      color-scheme: light;
-      --bg: #f6f8fb;
-      --surface: #ffffff;
-      --line: #d9e1ea;
-      --text: #172033;
-      --muted: #637083;
-      --brand: #0b6bcb;
-      --brand-dark: #084f96;
-      --ok: #147a4b;
-      --bad: #b42318;
-      --warn: #9a5b00;
-      --soft: #eef4fb;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      margin: 0;
-      background: var(--bg);
-      color: var(--text);
-      font-family: "Microsoft YaHei", "Segoe UI", Arial, sans-serif;
-      font-size: 14px;
-    }
-
-    header {
-      height: 56px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      background: #172033;
-      color: #fff;
-      border-bottom: 1px solid #0f1726;
-    }
-
-    header h1 {
-      margin: 0;
-      font-size: 18px;
-      font-weight: 650;
-    }
-
-    main {
-      display: grid;
-      grid-template-columns: 340px minmax(420px, 1fr) 430px;
-      gap: 12px;
-      padding: 12px;
-      height: calc(100vh - 56px);
-      min-height: 680px;
-    }
-
-    section {
-      min-width: 0;
-      background: var(--surface);
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
-
-    .section-head {
-      min-height: 48px;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--line);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      background: #fbfcfe;
-    }
-
-    .section-head h2 {
-      margin: 0;
-      font-size: 15px;
-      font-weight: 650;
-    }
-
-    .content {
-      padding: 12px;
-      overflow: auto;
-    }
-
-    .stack {
-      display: grid;
-      gap: 10px;
-    }
-
-    label {
-      display: grid;
-      gap: 4px;
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    input,
-    textarea,
-    select {
-      width: 100%;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      padding: 8px 9px;
-      color: var(--text);
-      background: #fff;
-      font: inherit;
-    }
-
-    textarea {
-      min-height: 80px;
-      resize: vertical;
-      line-height: 1.5;
-    }
-
-    button {
-      border: 1px solid transparent;
-      border-radius: 4px;
-      padding: 8px 11px;
-      font: inherit;
-      font-weight: 600;
-      cursor: pointer;
-      background: var(--soft);
-      color: var(--text);
-    }
-
-    button:hover {
-      border-color: #b8c8da;
-    }
-
-    button.primary {
-      background: var(--brand);
-      color: #fff;
-    }
-
-    button.primary:hover {
-      background: var(--brand-dark);
-    }
-
-    button.danger {
-      background: #fff2f0;
-      color: var(--bad);
-      border-color: #ffd0cc;
-    }
-
-    button.success {
-      background: #eaf7f0;
-      color: var(--ok);
-      border-color: #bfe6d1;
-    }
-
-    button:disabled {
-      cursor: not-allowed;
-      opacity: 0.5;
-    }
-
-    .row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .task,
-    .policy {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px;
-      background: #fff;
-      cursor: pointer;
-    }
-
-    .task.active,
-    .policy.active {
-      border-color: var(--brand);
-      background: #f2f7fd;
-    }
-
-    .title {
-      font-weight: 650;
-      line-height: 1.4;
-      overflow-wrap: anywhere;
-    }
-
-    .meta {
-      margin-top: 6px;
-      color: var(--muted);
-      font-size: 12px;
-      line-height: 1.5;
-      overflow-wrap: anywhere;
-    }
-
-    .badges {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 8px;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      border-radius: 999px;
-      padding: 3px 8px;
-      font-size: 12px;
-      background: #eef2f7;
-      color: #465365;
-      border: 1px solid #dce3ec;
-    }
-
-    .badge.approved {
-      background: #eaf7f0;
-      color: var(--ok);
-      border-color: #bfe6d1;
-    }
-
-    .badge.rejected {
-      background: #fff2f0;
-      color: var(--bad);
-      border-color: #ffd0cc;
-    }
-
-    .badge.pending {
-      background: #fff8e8;
-      color: var(--warn);
-      border-color: #f0d79b;
-    }
-
-    .summary-grid {
-      display: grid;
-      grid-template-columns: repeat(5, minmax(64px, 1fr));
-      gap: 8px;
-      margin-bottom: 10px;
-    }
-
-    .metric {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 8px;
-      background: #fbfcfe;
-    }
-
-    .metric strong {
-      display: block;
-      font-size: 18px;
-    }
-
-    .metric span {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    .empty {
-      padding: 18px;
-      color: var(--muted);
-      text-align: center;
-      border: 1px dashed var(--line);
-      border-radius: 6px;
-      background: #fbfcfe;
-    }
-
-    .details {
-      display: grid;
-      gap: 10px;
-    }
-
-    .evidence {
-      border: 1px solid var(--line);
-      border-radius: 6px;
-      padding: 10px;
-      background: #fbfcfe;
-      max-height: 180px;
-      overflow: auto;
-      white-space: pre-wrap;
-      line-height: 1.55;
-    }
-
-    .toolbar {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-
-    a {
-      color: var(--brand);
-      text-decoration: none;
-      overflow-wrap: anywhere;
-    }
-
-    a:hover {
-      text-decoration: underline;
-    }
-
-    .status-line {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
-    @media (max-width: 1120px) {
-      main {
-        grid-template-columns: 310px 1fr;
-        height: auto;
-      }
-
-      section.details-panel {
-        grid-column: 1 / -1;
-        min-height: 520px;
-      }
-    }
-
-    @media (max-width: 760px) {
-      main {
-        grid-template-columns: 1fr;
-        padding: 8px;
-      }
-
-      header {
-        padding: 0 12px;
-      }
-    }
-  </style>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Policy Monthly Report Agent</title>
+<style>
+:root{--navy:#172235;--brand:#1768ac;--bg:#f3f6f9;--surface:#fff;--line:#d8e0e8;--text:#172033;--muted:#647184;--green:#18794e;--red:#b42318;--amber:#9a5b00;--shadow:0 8px 22px rgba(23,32,51,.07)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 "Microsoft YaHei","Segoe UI",sans-serif}button,input,select,textarea{font:inherit}button{cursor:pointer}button:disabled{opacity:.5;cursor:not-allowed}a{color:var(--brand);text-decoration:none}
+header{min-height:64px;padding:0 24px;display:flex;align-items:center;gap:28px;background:var(--navy);color:#fff}.brand{min-width:270px}.brand strong{display:block;font-size:17px}.brand span{color:#b9c6d9;font-size:11px}.nav{display:flex;align-self:stretch}.nav button{min-width:120px;border:0;border-bottom:3px solid transparent;background:transparent;color:#c7d2e2;font-weight:650}.nav button.active{color:#fff;border-bottom-color:#65b5f6;background:#ffffff0f}.header-status{margin-left:auto;color:#c7d2e2;font-size:12px}
+.shell{max-width:1560px;margin:auto;padding:20px}.view[hidden]{display:none}.page-head{margin-bottom:16px;display:flex;align-items:end;justify-content:space-between;gap:16px}.page-head h1{margin:0 0 4px;font-size:23px}.page-head p{margin:0;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:9px;box-shadow:var(--shadow)}.card-head{padding:14px 16px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;gap:8px}.card-head h2{margin:0;font-size:15px}.card-body{padding:16px}.stack{display:grid;gap:12px}.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}label{display:grid;gap:5px;color:var(--muted);font-size:12px}input,select,textarea{width:100%;border:1px solid #cbd5df;border-radius:5px;padding:9px 10px;background:#fff;color:var(--text)}textarea{min-height:86px;resize:vertical}.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.btn{border:1px solid #cbd5df;border-radius:5px;padding:8px 13px;background:#fff;color:var(--text);font-weight:650}.btn.primary{border-color:var(--brand);background:var(--brand);color:#fff}.btn.success{border-color:#9dd5b9;background:#ebf7f1;color:var(--green)}.btn.danger{border-color:#f0b9b4;background:#fff1ef;color:var(--red)}.muted{color:var(--muted);font-size:12px}
+.search-layout{display:grid;grid-template-columns:minmax(520px,1.2fr) minmax(400px,.8fr);gap:16px;align-items:start}.source-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.source-option{display:flex;align-items:flex-start;gap:8px;min-height:62px;padding:10px;border:1px solid var(--line);border-radius:6px;background:#fbfcfd;color:var(--text);cursor:pointer}.source-option:has(input:checked){border-color:#79abd4;background:#edf5fc}.source-option input{width:auto;margin-top:3px}.source-option strong,.source-option span{display:block}.source-option span span{color:var(--muted);font-size:11px}
+.task-list,.candidate-list{display:grid;gap:9px}.task,.candidate{width:100%;border:1px solid var(--line);border-radius:7px;padding:12px;background:#fff;color:inherit;text-align:left}.task:hover,.candidate:hover,.candidate.active{border-color:var(--brand);background:#f5f9fd}.title{font-weight:650;line-height:1.45}.meta{margin-top:5px;color:var(--muted);font-size:12px}.snippet{margin-top:8px;color:#445164;font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.badge{border:1px solid #dbe2ea;border-radius:999px;padding:2px 7px;background:#f2f5f8;color:#516074;font-size:11px}.badge.accepted{background:#eaf7f0;color:var(--green)}.badge.rejected,.badge.failed{background:#fff2f0;color:var(--red)}.badge.deferred,.badge.pending{background:#fff8e7;color:var(--amber)}
+.result{border:1px solid #bcd6eb;border-radius:7px;padding:12px;background:#f2f8fd}.result.error{border-color:#efc2bd;background:#fff3f1;color:var(--red)}.messages{max-height:160px;overflow:auto;margin:8px 0 0;padding-left:20px;font-size:12px}.empty{padding:24px 14px;border:1px dashed #cbd5df;border-radius:7px;background:#fbfcfd;color:var(--muted);text-align:center}
+.review-layout{display:grid;grid-template-columns:270px minmax(390px,.85fr) minmax(470px,1.15fr);gap:14px;align-items:start}.review-layout>.card{min-height:calc(100vh - 154px);max-height:calc(100vh - 96px);overflow:hidden;display:flex;flex-direction:column}.review-layout .card-body{overflow:auto}.metrics{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric{border:1px solid var(--line);border-radius:6px;padding:9px;background:#fbfcfd}.metric strong{display:block;font-size:19px}.metric span{color:var(--muted);font-size:11px}.block{border-top:1px solid var(--line);padding-top:12px}.block:first-child{border:0;padding-top:0}.block-title{margin-bottom:7px;color:var(--muted);font-size:12px;font-weight:650}.preview{max-height:290px;overflow:auto;white-space:pre-wrap;border:1px solid var(--line);border-radius:6px;padding:11px;background:#fafbfd}.history{display:grid;gap:7px}.history-item{border-left:3px solid #abc2d8;padding:5px 0 5px 9px;font-size:12px}.flash{position:fixed;right:20px;bottom:20px;z-index:10;max-width:420px;border-radius:7px;padding:11px 14px;background:var(--navy);color:#fff;box-shadow:0 8px 28px #0004}.flash.error{background:#8f241d}
+.analysis-layout{display:grid;grid-template-columns:360px minmax(620px,1fr);gap:16px;align-items:start}.analysis-layout>.card{min-height:calc(100vh - 210px)}.agent-banner{margin-bottom:14px;border:1px solid #b8dfca;border-radius:7px;padding:11px 14px;background:#edf8f2;color:var(--green)}.agent-banner.unavailable{border-color:#efd59c;background:#fff8e7;color:var(--amber)}.analysis-list{display:grid;gap:9px;max-height:calc(100vh - 260px);overflow:auto}.analysis-sheet{display:grid;gap:14px}.analysis-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.analysis-text{white-space:pre-wrap;border-left:3px solid #9dbbd4;padding:6px 0 6px 11px;color:#354459}.evidence-list{margin:0;padding-left:20px}.placement{border:1px solid #b8dfca;border-radius:6px;padding:8px 10px;background:#edf8f2;color:var(--green);font-size:12px}
+@media(max-width:1180px){.search-layout{grid-template-columns:1fr}.review-layout{grid-template-columns:260px 1fr}.detail-card{grid-column:1/-1!important;max-height:none!important}}@media(max-width:760px){header{padding:8px 12px;gap:8px;flex-wrap:wrap}.brand{min-width:100%}.nav{height:44px}.header-status{display:none}.shell{padding:12px}.grid2,.source-grid,.review-layout{grid-template-columns:1fr}.review-layout>.card{min-height:auto;max-height:none}}
+@media(max-width:1180px){.analysis-layout{grid-template-columns:300px 1fr}}@media(max-width:760px){.analysis-layout,.analysis-grid{grid-template-columns:1fr}.analysis-layout>.card{min-height:auto}.analysis-list{max-height:none}}
+.report-toolbar{display:grid;grid-template-columns:220px 220px 1fr;gap:12px;align-items:end}.report-layout{display:grid;grid-template-columns:minmax(360px,.8fr) minmax(580px,1.2fr);gap:16px;align-items:start}.report-outline{display:grid;gap:11px;max-height:calc(100vh - 275px);overflow:auto}.report-group{padding:8px 2px 2px;color:var(--navy);font-size:16px;font-weight:700}.report-section{border:1px solid var(--line);border-radius:7px;background:#fbfcfd}.report-section-head{padding:10px 12px;border-bottom:1px solid var(--line)}.report-section-head strong{display:block}.report-items{display:grid;gap:6px;padding:8px}.report-item{width:100%;border:1px solid transparent;border-radius:5px;padding:9px;background:#fff;color:inherit;text-align:left}.report-item:hover,.report-item.active{border-color:var(--brand);background:#edf5fc}.report-item .title{font-size:13px}.report-item .meta{margin-top:3px}.report-banner{margin-bottom:14px;border:1px solid #b8dfca;border-radius:7px;padding:11px 14px;background:#edf8f2;color:var(--green)}.report-banner.blocked{border-color:#efd59c;background:#fff8e7;color:var(--amber)}.report-editor-sheet{display:grid;gap:13px}.report-editor-sheet textarea{min-height:230px}.revision-content{margin-top:5px;max-height:80px;overflow:hidden;white-space:pre-wrap;color:#526174}.removed-list{display:grid;gap:7px}.removed-item{display:flex;justify-content:space-between;gap:10px;align-items:center;border:1px dashed #d7a9a4;border-radius:6px;padding:8px 10px;background:#fff8f7}.locked-note{border-left:3px solid #d6a13a;padding:7px 10px;background:#fffaf0;color:var(--amber)}
+@media(max-width:1180px){.report-layout{grid-template-columns:340px 1fr}}@media(max-width:760px){.report-toolbar,.report-layout{grid-template-columns:1fr}.report-outline{max-height:none}.report-editor-sheet textarea{min-height:180px}}
+.generation-toolbar{display:grid;grid-template-columns:220px 1fr;gap:12px;align-items:end}.generation-layout{display:grid;grid-template-columns:minmax(520px,1.05fr) minmax(420px,.95fr);gap:16px;align-items:start}.generation-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}.generation-metric{border:1px solid var(--line);border-radius:7px;padding:11px;background:#fbfcfd}.generation-metric strong{display:block;font-size:17px}.generation-metric span{color:var(--muted);font-size:11px}.generation-history{display:grid;gap:9px}.generation-entry{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;border:1px solid var(--line);border-radius:7px;padding:11px;background:#fbfcfd}.generation-hash{word-break:break-all;font-family:Consolas,monospace;font-size:11px;color:var(--muted)}@media(max-width:900px){.generation-layout,.generation-toolbar,.generation-summary{grid-template-columns:1fr}.generation-entry{grid-template-columns:1fr}}</style>
 </head>
 <body>
-<header>
-  <h1>政策日报审核台</h1>
-  <div class="toolbar">
-    <button id="refreshTasksBtn">刷新任务</button>
-    <button id="generateBtn" class="primary" disabled>生成日报</button>
-  </div>
-</header>
-
-<main>
-  <section>
-    <div class="section-head">
-      <h2>任务</h2>
-      <span id="taskStatus" class="status-line"></span>
-    </div>
-    <div class="content stack">
-      <div class="stack">
-        <label>任务名称
-          <input id="taskNameInput" placeholder="政策日报任务">
-        </label>
-        <label>固定信源
-          <select id="sourceSelectInput">
-            <option value="">正在加载固定信源...</option>
-          </select>
-          <span class="status-line">选择后会自动填写栏目页 URL 和关键词；标记“需适配”的信源暂不可直接采集。</span>
-        </label>
-        <label>栏目页 URL
-          <input id="listPageUrlInput" placeholder="https://www.xxx.gov.cn/...">
-        </label>
-        <div class="row">
-          <label style="flex:1">开始日期
-            <input id="startDateInput" type="date">
-          </label>
-          <label style="flex:1">结束日期
-            <input id="endDateInput" type="date">
-          </label>
-        </div>
-        <label>关键词
-          <input id="keywordsInput" placeholder="人工智能,智能制造,大模型">
-        </label>
-        <div class="row">
-          <label style="width:120px">最大链接数
-            <input id="maxLinksInput" type="number" min="1" value="10">
-          </label>
-          <label style="width:150px">自动摘要
-            <select id="autoSummarizeInput">
-              <option value="false">否</option>
-              <option value="true">是</option>
-            </select>
-          </label>
-          <button id="collectBtn" class="primary" style="align-self:end">收集</button>
-        </div>
-      </div>
-      <div id="tasksList" class="stack"></div>
-    </div>
-  </section>
-
-  <section>
-    <div class="section-head">
-      <h2>审核列表</h2>
-      <span id="policyStatus" class="status-line"></span>
-    </div>
-    <div class="content">
-      <div class="summary-grid">
-        <div class="metric"><strong id="totalCount">0</strong><span>全部</span></div>
-        <div class="metric"><strong id="pendingCount">0</strong><span>待审</span></div>
-        <div class="metric"><strong id="approvedCount">0</strong><span>通过</span></div>
-        <div class="metric"><strong id="rejectedCount">0</strong><span>驳回</span></div>
-        <div class="metric"><strong id="needsEditCount">0</strong><span>修改</span></div>
-      </div>
-      <div id="policiesList" class="stack"></div>
-    </div>
-  </section>
-
-  <section class="details-panel">
-    <div class="section-head">
-      <h2>详情</h2>
-      <span id="detailStatus" class="status-line"></span>
-    </div>
-    <div class="content">
-      <div id="emptyDetail" class="empty">请选择政策</div>
-      <div id="detailForm" class="details" hidden>
-        <label>标题
-          <textarea id="titleEdit"></textarea>
-        </label>
-        <div class="row">
-          <label style="flex:1">来源单位
-            <input id="sourceNameEdit">
-          </label>
-          <label style="width:150px">发布日期
-            <input id="publishDateEdit" type="date">
-          </label>
-        </div>
-        <label>分类
-          <input id="categoryEdit">
-        </label>
-        <label>摘要
-          <textarea id="summaryEdit"></textarea>
-        </label>
-        <label>审核意见
-          <textarea id="reviewCommentEdit"></textarea>
-        </label>
-        <label>审核人
-          <input id="reviewedByEdit" placeholder="reviewer">
-        </label>
-        <div class="toolbar">
-          <button id="saveEditBtn">保存修改</button>
-          <button id="approveBtn" class="success">通过</button>
-          <button id="rejectBtn" class="danger">驳回</button>
-        </div>
-        <div>
-          <div class="meta">原文链接</div>
-          <a id="sourceUrlLink" href="#" target="_blank" rel="noopener"></a>
-        </div>
-        <div>
-          <div class="meta">证据片段</div>
-          <div id="evidenceBox" class="evidence"></div>
-        </div>
-      </div>
-    </div>
-  </section>
-</main>
-
-<script>
-  const applicationUrl = window.location.protocol === 'file:'
-    ? 'http://localhost:8081/'
-    : `${window.location.origin}/`;
-  if (window.location.protocol === 'file:') {
-    window.location.replace(applicationUrl);
-  }
-
-  const state = {
-    tasks: [],
-    policies: [],
-    sources: [],
-    selectedTaskId: null,
-    selectedPolicyId: null,
-    summary: null
-  };
-
-  const $ = (id) => document.getElementById(id);
-
-  const localDateInputValue = () => {
-    const now = new Date();
-    const localTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000);
-    return localTime.toISOString().slice(0, 10);
-  };
-
-  const statusClass = (status) => {
-    if (status === 'APPROVED') return 'approved';
-    if (status === 'REJECTED') return 'rejected';
-    return 'pending';
-  };
-
-  const statusText = (status) => ({
-    PENDING_REVIEW: '待审核',
-    APPROVED: '已通过',
-    REJECTED: '已驳回',
-    NEEDS_EDIT: '已修改'
-  }[status] || status || '待审核');
-
-  async function api(url, options = {}) {
-    let response;
-    try {
-      response = await fetch(url, {
-        headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-        ...options
-      });
-    } catch (error) {
-      throw new Error(`无法连接后端服务。请通过 ${applicationUrl} 打开审核台，并确认服务已启动。`);
-    }
-    if (!response.ok) {
-      let message = response.statusText;
-      try {
-        const body = await response.json();
-        message = body.message || message;
-      } catch (_) {}
-      throw new Error(message);
-    }
-    return response;
-  }
-
-  async function loadSources() {
-    try {
-      const response = await api('/api/policy-sources');
-      state.sources = await response.json();
-      renderSources();
-    } catch (error) {
-      $('taskStatus').textContent = '\u56fa\u5b9a\u4fe1\u6e90\u52a0\u8f7d\u5931\u8d25: ' + error.message;
-    }
-  }
-
-  function renderSources() {
-    const select = $('sourceSelectInput');
-    select.innerHTML = '<option value="">&#25163;&#21160;&#36755;&#20837; URL</option>';
-    state.sources.forEach(source => {
-      const option = document.createElement('option');
-      option.value = source.id;
-      option.disabled = source.directCrawl === false;
-      const suffix = source.directCrawl === false ? '\u9700\u9002\u914d' : (source.region || source.level || '');
-      option.textContent = `${source.name} (${suffix})`;
-      select.appendChild(option);
-    });
-  }
-
-  function applySelectedSource() {
-    const sourceId = $('sourceSelectInput').value;
-    const source = state.sources.find(item => item.id === sourceId);
-    if (!source) {
-      return;
-    }
-    $('listPageUrlInput').value = source.url || '';
-    $('keywordsInput').value = Array.isArray(source.keywords) ? source.keywords.join(',') : '';
-    if (!$('taskNameInput').value) {
-      const today = localDateInputValue();
-      $('taskNameInput').value = `${today} ${source.name}`;
-    }
-  }
-
-  async function loadTasks() {
-    $('taskStatus').textContent = '加载中';
-    try {
-      const response = await api('/api/tasks/recent');
-      state.tasks = await response.json();
-      renderTasks();
-      $('taskStatus').textContent = `${state.tasks.length} 个任务`;
-    } catch (error) {
-      $('taskStatus').textContent = error.message;
-    }
-  }
-
-  function renderTasks() {
-    const container = $('tasksList');
-    container.innerHTML = '';
-    if (!state.tasks.length) {
-      container.innerHTML = '<div class="empty">暂无任务</div>';
-      return;
-    }
-    state.tasks.forEach(task => {
-      const node = document.createElement('div');
-      node.className = 'task' + (task.id === state.selectedTaskId ? ' active' : '');
-      node.innerHTML = `
-        <div class="title">${escapeHtml(task.taskName || ('任务 ' + task.id))}</div>
-        <div class="meta">${escapeHtml(task.targetStartDate || 'open')} 至 ${escapeHtml(task.targetEndDate || 'open')}</div>
-        <div class="badges">
-          <span class="badge">${escapeHtml(task.status || '')}</span>
-          <span class="badge">保存 ${task.savedCount || 0}</span>
-          <span class="badge">失败 ${task.failedCount || 0}</span>
-        </div>
-      `;
-      node.addEventListener('click', () => selectTask(task.id));
-      container.appendChild(node);
-    });
-  }
-
-  async function selectTask(taskId) {
-    state.selectedTaskId = taskId;
-    state.selectedPolicyId = null;
-    renderTasks();
-    await Promise.all([loadSummary(taskId), loadPolicies(taskId)]);
-    renderDetail(null);
-  }
-
-  async function loadSummary(taskId) {
-    const response = await api(`/api/review/tasks/${taskId}/summary`);
-    state.summary = await response.json();
-    renderSummary();
-  }
-
-  function renderSummary() {
-    const summary = state.summary || {};
-    $('totalCount').textContent = summary.totalCount || 0;
-    $('pendingCount').textContent = summary.pendingCount || 0;
-    $('approvedCount').textContent = summary.approvedCount || 0;
-    $('rejectedCount').textContent = summary.rejectedCount || 0;
-    $('needsEditCount').textContent = summary.needsEditCount || 0;
-    $('generateBtn').disabled = !state.selectedTaskId || !(summary.approvedCount > 0);
-  }
-
-  async function loadPolicies(taskId) {
-    $('policyStatus').textContent = '加载中';
-    const response = await api(`/api/review/tasks/${taskId}/policies`);
-    state.policies = await response.json();
-    renderPolicies();
-    $('policyStatus').textContent = `${state.policies.length} 条政策`;
-  }
-
-  function renderPolicies() {
-    const container = $('policiesList');
-    container.innerHTML = '';
-    if (!state.policies.length) {
-      container.innerHTML = '<div class="empty">暂无政策</div>';
-      return;
-    }
-    state.policies.forEach(policy => {
-      const node = document.createElement('div');
-      node.className = 'policy' + (policy.id === state.selectedPolicyId ? ' active' : '');
-      node.innerHTML = `
-        <div class="title">${escapeHtml(policy.title || '')}</div>
-        <div class="meta">${escapeHtml(policy.sourceName || '')} · ${escapeHtml(policy.publishDate || '日期未知')}</div>
-        <div class="meta">${escapeHtml(policy.sourceDomain || '')}</div>
-        <div class="badges">
-          <span class="badge ${statusClass(policy.reviewStatus)}">${statusText(policy.reviewStatus)}</span>
-          <span class="badge">${escapeHtml(policy.authorityLevel || 'UNVERIFIED')}</span>
-          <span class="badge">${escapeHtml(policy.filterStatus || '')}</span>
-        </div>
-      `;
-      node.addEventListener('click', () => {
-        state.selectedPolicyId = policy.id;
-        renderPolicies();
-        renderDetail(policy);
-      });
-      container.appendChild(node);
-    });
-  }
-
-  function renderDetail(policy) {
-    if (!policy) {
-      $('emptyDetail').hidden = false;
-      $('detailForm').hidden = true;
-      $('detailStatus').textContent = '';
-      return;
-    }
-    $('emptyDetail').hidden = true;
-    $('detailForm').hidden = false;
-    $('detailStatus').textContent = statusText(policy.reviewStatus);
-    $('titleEdit').value = policy.title || '';
-    $('sourceNameEdit').value = policy.sourceName || '';
-    $('publishDateEdit').value = policy.publishDate || '';
-    $('categoryEdit').value = policy.category || '';
-    $('summaryEdit').value = policy.summary || '';
-    $('reviewCommentEdit').value = policy.reviewComment || '';
-    $('reviewedByEdit').value = policy.reviewedBy || '';
-    $('sourceUrlLink').href = policy.sourceUrl || '#';
-    $('sourceUrlLink').textContent = policy.sourceUrl || '';
-    $('evidenceBox').textContent = policy.evidenceSnippet || policy.content || '';
-  }
-
-  async function collectTask() {
-    const keywords = $('keywordsInput').value
-      .split(',')
-      .map(item => item.trim())
-      .filter(Boolean);
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
-
-    const payload = {
-      taskName: $('taskNameInput').value || null,
-      listPageUrl: $('listPageUrlInput').value,
-      targetStartDate: $('startDateInput').value || null,
-      targetEndDate: $('endDateInput').value || null,
-      keywords,
-      maxLinks: Number($('maxLinksInput').value || 10),
-      autoSummarize: $('autoSummarizeInput').value === 'true'
-    };
-    if (payload.targetStartDate > payload.targetEndDate) {
-      $('taskStatus').textContent = '开始日期不能晚于结束日期';
-      return;
-    }
-    if (!payload.listPageUrl) {
-      $('taskStatus').textContent = '请填写栏目页 URL';
-      return;
-    }
-    $('taskStatus').textContent = '收集中';
-    try {
-      const response = await api('/api/search/discover-and-save', {
-        method: 'POST',
-        body: JSON.stringify(payload)
-      });
-      const result = await response.json();
-      await loadTasks();
-      await selectTask(result.taskId);
-      $('taskStatus').textContent = '收集完成';
-    } catch (error) {
-      $('taskStatus').textContent = error.message;
-    }
-  }
-
-  async function saveEdit() {
-    const policy = selectedPolicy();
-    if (!policy) return;
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
-
-    const payload = {
-      title: $('titleEdit').value,
-      sourceName: $('sourceNameEdit').value,
-      publishDate: $('publishDateEdit').value || null,
-      category: $('categoryEdit').value,
-      summary: $('summaryEdit').value,
-      reviewComment: $('reviewCommentEdit').value,
-      reviewedBy: $('reviewedByEdit').value
-    };
-    await api(`/api/review/policies/${policy.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload)
-    });
-    await reloadSelectedTask('已保存');
-  }
-
-  async function reviewPolicy(action) {
-    const policy = selectedPolicy();
-    if (!policy) return;
-    let startDate = $('startDateInput').value || null;
-    let endDate = $('endDateInput').value || null;
-    if (!startDate && endDate) startDate = endDate;
-    if (startDate && !endDate) endDate = startDate;
-
-    const payload = {
-      reviewedBy: $('reviewedByEdit').value,
-      reviewComment: $('reviewCommentEdit').value
-    };
-    await api(`/api/review/policies/${policy.id}/${action}`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
-    await reloadSelectedTask(action === 'approve' ? '已通过' : '已驳回');
-  }
-
-  async function reloadSelectedTask(message) {
-    if (!state.selectedTaskId) return;
-    await Promise.all([loadSummary(state.selectedTaskId), loadPolicies(state.selectedTaskId)]);
-    const policy = state.policies.find(item => item.id === state.selectedPolicyId);
-    renderDetail(policy || null);
-    $('detailStatus').textContent = message;
-  }
-
-  async function generateReport() {
-    if (!state.selectedTaskId) return;
-    $('taskStatus').textContent = '生成中';
-    try {
-      const response = await fetch(`/api/daily-tasks/${state.selectedTaskId}/reports`, { method: 'POST' });
-      if (!response.ok) {
-        const body = await response.json();
-        throw new Error(body.message || response.statusText);
-      }
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `政策日报_任务${state.selectedTaskId}.docx`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-      $('taskStatus').textContent = '已生成';
-    } catch (error) {
-      $('taskStatus').textContent = error.message;
-    }
-  }
-
-  function selectedPolicy() {
-    return state.policies.find(item => item.id === state.selectedPolicyId);
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? '')
-      .replaceAll('&', '&amp;')
-      .replaceAll('<', '&lt;')
-      .replaceAll('>', '&gt;')
-      .replaceAll('"', '&quot;')
-      .replaceAll("'", '&#039;');
-  }
-
-  $('refreshTasksBtn').addEventListener('click', loadTasks);
-  $('sourceSelectInput').addEventListener('change', applySelectedSource);
-  $('collectBtn').addEventListener('click', collectTask);
-  $('saveEditBtn').addEventListener('click', saveEdit);
-  $('approveBtn').addEventListener('click', () => reviewPolicy('approve'));
-  $('rejectBtn').addEventListener('click', () => reviewPolicy('reject'));
-  $('generateBtn').addEventListener('click', generateReport);
-
-  const defaultDate = localDateInputValue();
-  $('startDateInput').value = defaultDate;
-  $('endDateInput').value = defaultDate;
-
-  loadSources();
-  loadTasks();
-</script>
+<header><div class="brand"><strong>Policy Monthly Report Agent</strong><span>政策月报人机协同工作台</span></div><nav class="nav"><button class="active" data-view="search">政策搜索</button><button data-view="review">候选政策审核</button><button data-view="analysis">已采纳政策</button></nav><div id="headerStatus" class="header-status">准备就绪</div></header>
+<div class="shell">
+<section id="searchView" class="view">
+<div class="page-head"><div><h1>政策搜索</h1><p>按月报周期选择多个政府信源；结果只进入候选池，不会自动写入月报。</p></div><button id="refreshTasksBtn" class="btn">刷新任务</button></div>
+<div class="search-layout">
+<article class="card"><div class="card-head"><h2>新建搜索任务</h2><span class="muted">搜索阶段不调用深度分析 Agent</span></div><div class="card-body stack">
+<div class="grid2"><label>目标月报月份<input id="reportMonth" type="month"></label><label>任务名称<input id="taskName" placeholder="例如：2026年8月政策候选检索"></label></div>
+<div class="grid2"><label>搜索开始日期<input id="startDate" type="date"></label><label>搜索结束日期<input id="endDate" type="date"></label></div>
+<div class="grid2"><label>关键词（逗号分隔）<textarea id="keywords">人工智能,大模型,智能体,人工智能+,数据集,算力,智能制造,工业互联网,数字化转型,软件和信息技术</textarea></label><label>每个信源最大链接数<input id="maxLinks" type="number" min="1" max="50" value="10"><span class="muted">继续执行 URL、正文哈希去重和日期过滤。</span></label></div>
+<div class="toolbar" style="justify-content:space-between"><strong>搜索来源</strong><div class="toolbar"><button id="selectAll" class="btn">全选</button><button id="clearAll" class="btn">清空</button></div></div><div id="sourceGrid" class="source-grid"><div class="empty">正在加载信源…</div></div>
+<div class="toolbar"><button id="runSearch" class="btn primary">开始搜索并进入候选池</button><span id="searchStatus" class="muted"></span></div><div id="searchResult" hidden></div>
+</div></article>
+<article class="card"><div class="card-head"><h2>最近搜索任务</h2><span id="taskCount" class="muted"></span></div><div class="card-body"><div id="taskList" class="task-list"></div></div></article>
+</div></section>
+<section id="reviewView" class="view" hidden>
+<div class="page-head"><div><h1>候选政策审核</h1><p>人工打开政府原文并决定采纳、不采纳或暂缓；只有采纳项可进入 Agent 分析。</p></div><button id="refreshCandidates" class="btn">刷新候选池</button></div>
+<div class="review-layout">
+<aside class="card"><div class="card-head"><h2>任务与筛选</h2></div><div class="card-body stack">
+<label>搜索任务<select id="reviewTask"><option value="">请选择任务</option></select></label><label>审核状态<select id="statusFilter"><option value="">全部状态</option><option value="PENDING">待审核</option><option value="ACCEPTED">已采纳</option><option value="REJECTED">不采纳</option><option value="DEFERRED">暂缓</option></select></label><label>关键词<input id="keywordFilter" placeholder="标题、单位、主题"></label><label>发现来源<select id="sourceFilter"><option value="">全部来源</option></select></label><button id="applyFilter" class="btn primary">应用筛选</button>
+<div class="metrics"><div class="metric"><strong id="totalCount">0</strong><span>全部</span></div><div class="metric"><strong id="pendingCount">0</strong><span>待审核</span></div><div class="metric"><strong id="acceptedCount">0</strong><span>已采纳</span></div><div class="metric"><strong id="rejectedCount">0</strong><span>不采纳</span></div><div class="metric"><strong id="deferredCount">0</strong><span>暂缓</span></div></div>
+</div></aside>
+<article class="card"><div class="card-head"><h2>候选列表</h2><span id="candidateCount" class="muted"></span></div><div class="card-body"><div id="candidateList" class="candidate-list"></div></div></article>
+<article class="card detail-card"><div class="card-head"><h2>政策详情与审核</h2><span id="detailState" class="muted"></span></div><div class="card-body"><div id="emptyDetail" class="empty">请先选择一条候选政策</div><div id="detailPanel" class="stack" hidden>
+<div class="block stack"><label>政策标题<textarea id="titleEdit"></textarea></label><div class="grid2"><label>发布单位<input id="sourceNameEdit"></label><label>发布日期<input id="publishDateEdit" type="date"></label></div><label>政策分类<input id="categoryEdit"></label><div class="toolbar"><button id="savePolicy" class="btn">保存元数据</button><a id="originalLink" class="btn" target="_blank" rel="noopener noreferrer">打开政府原文</a></div></div>
+<div class="block"><div class="block-title">搜索阶段短摘要 / 证据片段</div><div id="summaryBox" class="preview"></div></div><div class="block"><div class="block-title">清洗后的政策正文</div><div id="contentBox" class="preview"></div></div>
+<div class="block stack"><label>审核人<input id="reviewedBy" placeholder="请输入审核人姓名"></label><label>审核意见<textarea id="reviewComment" placeholder="说明采纳、不采纳或暂缓原因"></textarea></label><div class="toolbar"><button id="accept" class="btn success">采纳</button><button id="reject" class="btn danger">不采纳</button><button id="defer" class="btn">暂缓</button><button id="pending" class="btn">恢复待审核</button></div></div>
+<div class="block"><div class="block-title">审核历史</div><div id="historyList" class="history"></div></div>
+</div></div></article>
+</div></section>
+<section id="analysisView" class="view" hidden>
+<div class="page-head"><div><h1>已采纳政策与 Agent 分析</h1><p>仅处理人工采纳的政策；Agent 结果必须再次由人工确认后才能进入月报内容池。</p></div><button id="refreshAccepted" class="btn">刷新已采纳政策</button></div>
+<div id="agentBanner" class="agent-banner unavailable">正在检查 Agent 配置…</div>
+<div class="analysis-layout">
+<aside class="card"><div class="card-head"><h2>已采纳政策</h2><span id="acceptedPolicyCount" class="muted"></span></div><div class="card-body"><div id="acceptedPolicyList" class="analysis-list"></div></div></aside>
+<article class="card"><div class="card-head"><h2>分析、人工确认与入池</h2><span id="analysisDetailState" class="muted"></span></div><div class="card-body">
+<div id="analysisEmpty" class="empty">请先选择一条已采纳政策</div>
+<div id="analysisPanel" class="analysis-sheet" hidden>
+<div class="block"><div id="acceptedTitle" class="title"></div><div id="acceptedMeta" class="meta"></div><div class="toolbar" style="margin-top:9px"><a id="acceptedOriginalLink" class="btn" target="_blank" rel="noopener noreferrer">查看政府原文</a><button id="refreshAcceptedContent" class="btn">重新抓取正文与附件</button></div></div>
+<div id="contentQualityBanner" class="agent-banner unavailable">正文完整性尚未检查</div>
+<div class="block"><div class="block-title">政策附件</div><div id="acceptedAttachmentList" class="history-list"></div></div>
+<div class="block"><div class="block-title">供 Agent 使用的完整正文</div><div id="acceptedContent" class="preview"></div></div>
+<div class="block stack"><div class="grid2"><label>分析操作人<input id="analysisCreatedBy" placeholder="请输入操作人姓名"></label><label>历史分析版本<select id="analysisHistory"><option value="">暂无分析</option></select></label></div><div class="toolbar"><button id="runAnalysis" class="btn primary">开始 Agent 分析</button><span id="analysisRunStatus" class="muted"></span></div></div>
+<div id="analysisResultPanel" class="block analysis-sheet" hidden>
+<div class="analysis-grid"><div><div class="block-title">政策基本信息</div><div id="analysisBasicInfo" class="analysis-text"></div></div><div><div class="block-title">核心内容</div><div id="analysisCore" class="analysis-text"></div></div></div>
+<div><div class="block-title">与月报主题相关内容</div><div id="analysisRelevant" class="analysis-text"></div></div>
+<div class="analysis-grid"><label>人工确认栏目<select id="analysisSection"></select><span id="sectionGuide" class="muted"></span></label><div><div class="block-title">Agent 推荐理由</div><div id="analysisReason" class="analysis-text"></div></div></div>
+<label>月报条目标题<input id="analysisGeneratedTitle"></label><label>月报正文（可人工修改）<textarea id="analysisGeneratedContent" style="min-height:170px"></textarea></label>
+<div><div class="block-title">原文证据</div><ul id="analysisEvidence" class="evidence-list"></ul></div><div id="analysisPlacements" class="stack"></div>
+<div class="block stack"><strong>人工确认并进入月报内容池</strong><div class="grid2"><label>月报月份<input id="contentReportMonth" type="month"></label><label>确认人<input id="contentConfirmedBy" placeholder="请输入确认人姓名"></label></div><button id="confirmAnalysis" class="btn success">确认并进入月报内容池</button></div>
+</div></div></div></article>
+</div></section></div><div id="flash" class="flash" hidden></div>
+<div class="shell"><section id="reportEditorView" class="view" hidden>
+<div class="page-head"><div><h1>月报内容编辑</h1><p>按模板栏目人工复核、改写和排序；整月确认后才允许生成正式 Word。</p></div><button id="refreshReportEditor" class="btn">刷新工作区</button></div>
+<article class="card" style="margin-bottom:16px"><div class="card-body report-toolbar"><label>月报月份<input id="editorReportMonth" type="month"></label><label>当前操作人<input id="reportOperator" placeholder="请输入编辑或确认人姓名"></label><div class="toolbar"><button id="loadReportEditor" class="btn primary">加载 / 创建月报</button><button id="confirmReportContent" class="btn success" hidden>整月内容确认</button><button id="reopenReportContent" class="btn" hidden>重新打开编辑</button></div></div></article>
+<div id="reportEditorEmpty" class="empty">请选择月份并加载月报内容工作区</div>
+<div id="reportEditorPanel" hidden>
+<div id="reportStatusBanner" class="report-banner blocked"></div>
+<div class="report-layout">
+<aside class="stack"><article class="card"><div class="card-head"><h2 id="reportEditorTitle">月报栏目</h2><span id="reportEditorState" class="muted"></span></div><div class="card-body"><div id="reportSectionList" class="report-outline"></div></div></article><article class="card"><div class="card-head"><h2>已删除内容</h2><span id="removedItemCount" class="muted"></span></div><div class="card-body"><div id="removedItemList" class="removed-list"></div></div></article></aside>
+<article class="card"><div class="card-head"><h2>条目编辑与追溯</h2><span id="reportItemState" class="muted"></span></div><div class="card-body"><div id="reportItemEmpty" class="empty">请从左侧栏目选择一条月报内容</div><div id="reportItemPanel" class="report-editor-sheet" hidden>
+<div id="reportLockedNote" class="locked-note" hidden>本月内容已经整月确认。若需修改，请先点击“重新打开编辑”。</div>
+<div class="grid2"><label>所属栏目<select id="reportItemSection"></select><span id="reportSectionGuide" class="muted"></span></label><label>来源与操作<div id="reportItemSources" class="history"></div></label></div>
+<label>月报条目标题<input id="reportItemTitle"></label><label>最终月报正文<textarea id="reportItemContent"></textarea></label>
+<div class="toolbar"><button id="saveReportItem" class="btn primary">保存修改</button><button id="moveReportItemUp" class="btn">上移</button><button id="moveReportItemDown" class="btn">下移</button><button id="removeReportItem" class="btn danger">删除条目</button></div>
+<div class="block"><div class="block-title">Agent 首次生成结果</div><div id="reportAgentDraft" class="preview"></div></div><div class="block"><div class="block-title">人工修改历史</div><div id="reportRevisionList" class="history"></div></div>
+</div></div></article>
+</div></div>
+</section></div>
+<div class="shell"><section id="generationView" class="view" hidden>
+<div class="page-head"><div><h1>生成正式月报</h1><p>只读取已经整月人工确认的内容，直接填充原始 Word 模板；每次生成都会归档，可追溯、可重新下载。</p></div><button id="refreshGeneration" class="btn">刷新生成状态</button></div>
+<article class="card" style="margin-bottom:16px"><div class="card-body generation-toolbar"><label>月报月份<input id="generationReportMonth" type="month"></label><div class="toolbar"><button id="loadGeneration" class="btn primary">加载已有月报</button><button id="goReportEditor" class="btn">返回月报内容编辑</button></div></div></article>
+<div id="generationEmpty" class="empty">请选择月份并加载已经创建的月报。生成页面不会自动创建空月报。</div>
+<div id="generationPanel" hidden><div id="generationBanner" class="report-banner blocked"></div><div class="generation-summary" style="margin-bottom:16px"><div class="generation-metric"><strong id="generationReportTitle">—</strong><span>月报</span></div><div class="generation-metric"><strong id="generationItemCount">0</strong><span>已确认内容条目</span></div><div class="generation-metric"><strong id="generationArchiveCount">0</strong><span>已归档 Word 版本</span></div></div>
+<div class="generation-layout"><article class="card"><div class="card-head"><h2>正式月报参数</h2><span id="generationState" class="muted"></span></div><div class="card-body stack"><div class="grid2"><label>当年期号<input id="generationIssueNo" type="number" min="1" value="1"></label><label>总期号<input id="generationTotalIssueNo" type="number" min="1" value="1"></label></div><label>报送单位<textarea id="generationReportTo" placeholder="例如：山东省工业和信息化厅"></textarea></label><label>抄送单位<textarea id="generationSendTo" placeholder="如无抄送，请按正式月报要求填写"></textarea></label><label>联系人及联系方式<textarea id="generationContactInfo" placeholder="联系人、电话等"></textarea></label><label>生成操作人<input id="generationGeneratedBy" placeholder="请输入本次生成操作人姓名"></label><div class="toolbar"><button id="generateMonthlyReport" class="btn success">填充模板并下载正式 Word</button><span class="muted">生成后本月状态变为“已生成”；如需修改，请重新打开编辑并再次确认。</span></div></div></article>
+<article class="card"><div class="card-head"><h2>历史生成档案</h2><span class="muted">旧版本不会被覆盖</span></div><div class="card-body"><div id="generationHistory" class="generation-history"></div></div></article></div></div>
+</section></div><script>
+document.querySelector('.nav').insertAdjacentHTML('beforeend','<button data-view="report-editor">月报内容编辑</button><button data-view="generation">生成月报</button>');
+const appUrl=location.protocol==='file:'?'http://localhost:8081/':`${location.origin}/`;if(location.protocol==='file:')location.replace(appUrl);
+const state={sources:[],tasks:[],candidates:[],taskId:null,policyId:null,candidate:null,agentStatus:null,acceptedPolicies:[],acceptedPolicyId:null,acceptedPolicy:null,analyses:[],analysisId:null,sections:[],generationReport:null,generationHistory:[]};const $=id=>document.getElementById(id);
+async function api(url,options={}){let response;try{response=await fetch(url,{...options,headers:{'Content-Type':'application/json',...(options.headers||{})}})}catch(_){throw new Error(`无法连接后端，请通过 ${appUrl} 访问并确认服务已启动。`)}if(!response.ok){let message=`${response.status} ${response.statusText}`;try{const body=await response.json();message=body.message||message}catch(_){}throw new Error(message)}return response}
+function showView(name,hash=true){const view=['search','review','analysis'].includes(name)?name:'search';$('searchView').hidden=view!=='search';$('reviewView').hidden=view!=='review';$('analysisView').hidden=view!=='analysis';document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(hash)history.replaceState(null,'',`#${view}`)}
+function flash(message,error=false){const node=$('flash');node.textContent=message;node.className=`flash${error?' error':''}`;node.hidden=false;clearTimeout(flash.timer);flash.timer=setTimeout(()=>node.hidden=true,4000)}
+function esc(value){return String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}
+const statusText=s=>({PENDING:'待审核',ACCEPTED:'已采纳',REJECTED:'不采纳',DEFERRED:'暂缓',READY:'待分析',NOT_ANALYZED:'未分析',ANALYZING:'分析中',ANALYZED:'已分析',RUNNING:'执行中',SUCCEEDED:'分析成功',COMPLETED:'已完成',PARTIAL_FAILED:'部分失败',FAILED:'失败',CONFIRMED:'已确认',DRAFT:'草稿',UNKNOWN:'未检查',COMPLETE:'完整',PARTIAL:'部分完整',PAGE_ONLY:'仅网页正文',DETECTED:'已发现',UNSUPPORTED:'暂不支持'})[s]||s||'未知';const statusClass=s=>String(s||'').toLowerCase().replaceAll('_','-');
+function localDate(d=new Date()){const v=new Date(d.getTime()-d.getTimezoneOffset()*60000);return v.toISOString().slice(0,10)}
+async function loadSources(){state.sources=await(await api('/api/policy-sources')).json();$('sourceGrid').innerHTML=state.sources.map((s,i)=>`<label class="source-option"><input type="checkbox" name="sourceId" value="${esc(s.id)}" ${s.directCrawl||i<2?'checked':''}><span><strong>${esc(s.name)}</strong><span>${esc(s.region||s.level||'')} · ${esc(s.type||'policy')} · ${s.directCrawl?'已验证直采':'通用适配'}</span></span></label>`).join('')||'<div class="empty">未配置信源</div>';$('sourceFilter').innerHTML='<option value="">全部来源</option>'+state.sources.map(s=>`<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}
+async function loadTasks(){$('headerStatus').textContent='正在加载任务…';state.tasks=await(await api('/api/search-tasks/recent')).json();renderTasks();renderTaskOptions();$('headerStatus').textContent=`已加载 ${state.tasks.length} 个搜索任务`}
+function renderTasks(){$('taskCount').textContent=`${state.tasks.length} 个任务`;$('taskList').innerHTML=state.tasks.map(t=>`<button class="task" data-task="${t.id}"><div class="title">${esc(t.taskName||`任务 ${t.id}`)}</div><div class="meta">${esc(t.targetStartDate)} 至 ${esc(t.targetEndDate)} · ${esc(t.reportMonth||'未绑定月份')}</div><div class="badges"><span class="badge ${statusClass(t.status)}">${statusText(t.status)}</span><span class="badge">发现 ${t.foundCount||0}</span><span class="badge">新增 ${t.savedCount||0}</span><span class="badge">重复 ${t.duplicateCount||0}</span><span class="badge">失败 ${t.failedCount||0}</span></div>${t.failureMessage?`<div class="snippet">${esc(t.failureMessage)}</div>`:''}</button>`).join('')||'<div class="empty">暂无搜索任务</div>'}
+function renderTaskOptions(){const selected=state.taskId?String(state.taskId):'';$('reviewTask').innerHTML='<option value="">请选择任务</option>'+state.tasks.map(t=>`<option value="${t.id}">${esc(t.taskName)} · ${statusText(t.status)}</option>`).join('');$('reviewTask').value=selected}
+async function runSearch(){const sourceIds=[...document.querySelectorAll('input[name="sourceId"]:checked')].map(i=>i.value);const payload={taskName:$('taskName').value.trim()||null,reportMonth:$('reportMonth').value||null,targetStartDate:$('startDate').value||null,targetEndDate:$('endDate').value||null,keywords:$('keywords').value.split(/[,，]/).map(v=>v.trim()).filter(Boolean),sourceIds,maxLinksPerSource:Number($('maxLinks').value||10)};if(!payload.targetStartDate||!payload.targetEndDate)return flash('请选择完整日期范围',true);if(payload.targetStartDate>payload.targetEndDate)return flash('开始日期不能晚于结束日期',true);if(!sourceIds.length)return flash('至少选择一个政府信源',true);$('runSearch').disabled=true;$('searchStatus').textContent='正在采集和清洗政策页面…';try{const result=await(await api('/api/search-tasks/run',{method:'POST',body:JSON.stringify(payload)})).json();renderResult(result);state.taskId=result.taskId;await loadTasks();flash(`任务完成，候选池关联 ${result.associatedCount} 条`)}catch(e){renderResult({error:e.message});flash(e.message,true)}finally{$('runSearch').disabled=false;$('searchStatus').textContent=''}}
+function renderResult(r){const n=$('searchResult');n.hidden=false;if(r.error){n.className='result error';n.textContent=r.error;return}n.className='result';n.innerHTML=`<strong>任务 ${r.taskId}：${statusText(r.status)}</strong><div class="badges"><span class="badge">发现 ${r.foundCount}</span><span class="badge">新增 ${r.savedCount}</span><span class="badge">重复 ${r.duplicateCount}</span><span class="badge">过滤 ${r.filteredCount}</span><span class="badge">失败 ${r.failedCount}</span><span class="badge">候选关联 ${r.associatedCount}</span></div>${r.messages?.length?`<ul class="messages">${r.messages.map(m=>`<li>${esc(m)}</li>`).join('')}</ul>`:''}`}
+async function openReview(id){state.taskId=Number(id);state.policyId=null;renderTaskOptions();showView('review');await loadReview()}
+async function loadReview(){if(!state.taskId){state.candidates=[];renderCandidates();renderSummary({});renderDetail(null);return}const params=new URLSearchParams();if($('statusFilter').value)params.set('status',$('statusFilter').value);if($('keywordFilter').value.trim())params.set('keyword',$('keywordFilter').value.trim());if($('sourceFilter').value)params.set('sourceId',$('sourceFilter').value);const suffix=params.toString()?`?${params}`:'';const [p,s]=await Promise.all([api(`/api/review/search-tasks/${state.taskId}/policies${suffix}`),api(`/api/review/search-tasks/${state.taskId}/summary`)]);state.candidates=await p.json();const summary=await s.json();renderCandidates();renderSummary(summary);if(state.policyId&&state.candidates.some(v=>v.id===state.policyId))await selectCandidate(state.policyId);else if(state.policyId)renderDetail(null);$('headerStatus').textContent=`候选池 ${summary.totalCount||0} 条，当前 ${state.candidates.length} 条`}
+function renderSummary(s){$('totalCount').textContent=s.totalCount||0;$('pendingCount').textContent=s.pendingCount||0;$('acceptedCount').textContent=s.acceptedCount||0;$('rejectedCount').textContent=s.rejectedCount||0;$('deferredCount').textContent=s.deferredCount||0}
+function renderCandidates(){$('candidateCount').textContent=`${state.candidates.length} 条`;$('candidateList').innerHTML=state.candidates.map(p=>`<button class="candidate ${p.id===state.policyId?'active':''}" data-policy="${p.id}"><div class="title">${esc(p.title)}</div><div class="meta">${esc(p.sourceName||'来源未知')} · ${esc(p.publishDate||'日期未知')}</div><div class="snippet">${esc(p.shortSummary||'暂无摘要，请打开政府原文。')}</div><div class="badges"><span class="badge ${statusClass(p.reviewStatus)}">${statusText(p.reviewStatus)}</span><span class="badge">相关性 ${p.relevanceScore??'待评估'}</span><span class="badge">${esc(p.policyType||p.category||'政策材料')}</span></div></button>`).join('')||'<div class="empty">当前任务或筛选条件下暂无候选政策</div>'}
+async function selectCandidate(id){state.policyId=Number(id);renderCandidates();const [d,h]=await Promise.all([api(`/api/review/search-tasks/${state.taskId}/policies/${state.policyId}`),api(`/api/review/policies/${state.policyId}/history`)]);state.candidate=await d.json();renderDetail(state.candidate,await h.json())}
+function renderDetail(p,history=[]){if(!p){state.candidate=null;$('emptyDetail').hidden=false;$('detailPanel').hidden=true;$('detailState').textContent='';return}$('emptyDetail').hidden=true;$('detailPanel').hidden=false;$('detailState').textContent=`${statusText(p.reviewStatus)} · ${p.analysisStatus||'NOT_ANALYZED'} · 正文${statusText(p.contentCompleteness)}`;$('titleEdit').value=p.title||'';$('sourceNameEdit').value=p.sourceName||'';$('publishDateEdit').value=p.publishDate||'';$('categoryEdit').value=p.category||'';$('reviewComment').value=p.reviewComment||'';$('reviewedBy').value=p.reviewedBy||'';$('originalLink').href=p.sourceUrl||p.discoveredUrl||'#';$('summaryBox').textContent=p.shortSummary||p.evidenceSnippet||'暂无短摘要';$('contentBox').textContent=p.content||'正文抓取结果为空，请以政府原文为准。';[['accept','ACCEPTED'],['reject','REJECTED'],['defer','DEFERRED'],['pending','PENDING']].forEach(([id,s])=>$(id).disabled=p.reviewStatus===s);$('historyList').innerHTML=history.map(h=>`<div class="history-item"><strong>${statusText(h.previousStatus)} → ${statusText(h.reviewStatus)}</strong>${esc(h.reviewedBy)} · ${esc(h.reviewedAt||'')}<br>${esc(h.reviewComment||'无审核意见')}</div>`).join('')||'<div class="muted">暂无审核历史</div>'}
+async function savePolicy(){const p=state.candidate;if(!p)return;const payload={title:$('titleEdit').value.trim(),sourceName:$('sourceNameEdit').value.trim(),publishDate:$('publishDateEdit').value||null,category:$('categoryEdit').value.trim(),reviewComment:$('reviewComment').value,reviewedBy:$('reviewedBy').value};await api(`/api/review/policies/${p.id}`,{method:'PATCH',body:JSON.stringify(payload)});await loadReview();flash('政策元数据已保存')}
+async function review(action){const p=state.candidate;if(!p)return;const reviewedBy=$('reviewedBy').value.trim();if(!reviewedBy)return flash('审核人不能为空',true);await api(`/api/review/policies/${p.id}/${action}`,{method:'POST',body:JSON.stringify({reviewedBy,reviewComment:$('reviewComment').value.trim()})});await loadReview();flash('审核状态已更新')}
+async function loadAnalysisPage(){const responses=await Promise.all([api('/api/agent/status'),api('/api/accepted-policies/sections'),api('/api/accepted-policies')]);state.agentStatus=await responses[0].json();state.sections=await responses[1].json();state.acceptedPolicies=await responses[2].json();renderAgentBanner();renderAcceptedPolicies();if(state.acceptedPolicyId&&state.acceptedPolicies.some(p=>p.id===state.acceptedPolicyId))await selectAcceptedPolicy(state.acceptedPolicyId);else renderAcceptedDetail(null);$('headerStatus').textContent=`已采纳 ${state.acceptedPolicies.length} 条 · ${state.agentStatus.available?'Agent 已就绪':'Agent 未启用'}`}
+function renderAgentBanner(){const n=$('agentBanner'),s=state.agentStatus||{};n.className=`agent-banner${s.available?'':' unavailable'}`;n.textContent=`${s.available?'✓':'!'} ${s.message||'Agent 状态未知'}${s.model?` · 模型：${s.model}`:''}`}
+function renderAcceptedPolicies(){$('acceptedPolicyCount').textContent=`${state.acceptedPolicies.length} 条`;$('acceptedPolicyList').innerHTML=state.acceptedPolicies.map(p=>`<button class="candidate ${p.id===state.acceptedPolicyId?'active':''}" data-accepted-policy="${p.id}"><div class="title">${esc(p.title)}</div><div class="meta">${esc(p.sourceName||'来源未知')} · ${esc(p.publishDate||'日期未知')}</div><div class="badges"><span class="badge accepted">已采纳</span><span class="badge ${statusClass(p.contentCompleteness)}">正文${statusText(p.contentCompleteness)}</span><span class="badge ${statusClass(p.analysisStatus)}">${statusText(p.analysisStatus)}</span>${p.latestAnalysis?`<span class="badge">v${p.latestAnalysis.versionNo} · ${statusText(p.latestAnalysis.runStatus)}</span>`:''}</div></button>`).join('')||'<div class="empty">暂无已采纳政策，请先在候选审核页面完成采纳。</div>'}
+async function selectAcceptedPolicy(id){state.acceptedPolicyId=Number(id);renderAcceptedPolicies();state.acceptedPolicy=await(await api(`/api/accepted-policies/${state.acceptedPolicyId}`)).json();state.analyses=state.acceptedPolicy.analyses||[];state.analysisId=state.analyses.length?state.analyses[0].id:null;renderAcceptedDetail(state.acceptedPolicy)}
+function renderAcceptedDetail(p){if(!p){state.acceptedPolicy=null;state.analyses=[];state.analysisId=null;$('analysisEmpty').hidden=false;$('analysisPanel').hidden=true;$('analysisDetailState').textContent='';return}$('analysisEmpty').hidden=true;$('analysisPanel').hidden=false;const quality=p.contentCompleteness||'UNKNOWN';$('analysisDetailState').textContent=`${statusText(p.analysisStatus)} · ${p.analyses?.length||0} 个版本 · 正文${statusText(quality)}`;$('acceptedTitle').textContent=p.title||'';$('acceptedMeta').textContent=`${p.sourceName||'来源未知'} · ${p.publishDate||'日期未知'} · 审核人：${p.reviewedBy||'未记录'}`;$('acceptedOriginalLink').href=p.sourceUrl||'#';$('acceptedContent').textContent=p.content||'正文为空，无法进行分析。';const qualityBanner=$('contentQualityBanner');qualityBanner.className=`agent-banner${quality==='COMPLETE'?'':' unavailable'}`;qualityBanner.textContent=`正文${statusText(quality)} · 附件成功 ${p.extractedAttachmentCount||0}/${p.attachmentCount||0} · ${p.contentQualityReason||'请重新抓取正文与附件'}`;$('acceptedAttachmentList').innerHTML=(p.attachments||[]).map(a=>`<div class="history-item"><strong><a href="${esc(a.sourceUrl)}" target="_blank" rel="noopener noreferrer">${esc(a.fileName)}</a></strong><span class="badge ${statusClass(a.extractionStatus)}">${statusText(a.extractionStatus)}</span><br><span class="muted">${esc(a.fileType||'未知格式')} · ${a.contentLength||0} 字${a.errorMessage?` · ${esc(a.errorMessage)}`:''}</span></div>`).join('')||'<div class="muted">未发现政策正文附件</div>';$('runAnalysis').disabled=!state.agentStatus?.available||quality!=='COMPLETE';$('runAnalysis').textContent=p.analyses?.length?'重新进行 Agent 分析':'开始 Agent 分析';$('analysisHistory').innerHTML=(p.analyses||[]).map(a=>`<option value="${a.id}">v${a.versionNo} · ${statusText(a.runStatus)} · ${esc(a.createdBy||'未知')}</option>`).join('')||'<option value="">暂无分析</option>';$('analysisHistory').value=state.analysisId?String(state.analysisId):'';renderAnalysisVersion((p.analyses||[]).find(a=>a.id===state.analysisId)||null)}
+function renderAnalysisVersion(a){if(!a){$('analysisResultPanel').hidden=true;$('analysisRunStatus').textContent=!state.agentStatus?.available?'Agent 未启用':state.acceptedPolicy?.contentCompleteness!=='COMPLETE'?'请先重新抓取并补齐附件正文':'尚未分析';return}$('analysisRunStatus').textContent=`v${a.versionNo} · ${statusText(a.runStatus)} · ${a.modelName||'未记录模型'}`;if(a.runStatus!=='SUCCEEDED'){$('analysisResultPanel').hidden=true;if(a.errorMessage)$('analysisRunStatus').textContent+=` · ${a.errorMessage}`;return}$('analysisResultPanel').hidden=false;const b=a.basicInfo||{};$('analysisBasicInfo').textContent=[`政策：${b.policyName||'原文未明确'}`,`主体：${b.issuingAuthority||'原文未明确'}`,`日期：${b.publishDate||'原文未明确'}`,`背景：${b.policyBackground||'原文未明确'}`].join('\n');$('analysisCore').textContent=a.coreContent||'原文未明确';$('analysisRelevant').textContent=a.relevantContent||'原文未明确';$('analysisReason').textContent=a.recommendationReason||'';$('analysisSection').innerHTML=state.sections.map(s=>`<option value="${esc(s.sectionCode)}">${esc(s.sectionName)}（${esc(s.sectionCode)}）</option>`).join('');$('analysisSection').value=state.sections.some(s=>s.sectionCode===a.recommendedSectionCode)?a.recommendedSectionCode:(state.sections[0]?.sectionCode||'');updateSectionGuide();$('analysisGeneratedTitle').value=a.generatedTitle||state.acceptedPolicy?.title||'';$('analysisGeneratedContent').value=a.generatedContent||'';$('analysisEvidence').innerHTML=(a.evidence||[]).map(v=>`<li>${esc(v)}</li>`).join('')||'<li class="muted">模型未返回证据摘录，请以政策原文为准。</li>';$('analysisPlacements').innerHTML=(a.placements||[]).map(v=>`<div class="placement">已进入月报内容池：报告 #${v.reportId} · 条目 #${v.reportItemId} · ${statusText(v.status)}</div>`).join('');$('confirmAnalysis').disabled=false}
+function updateSectionGuide(){const selected=state.sections.find(s=>s.sectionCode===$('analysisSection').value);$('sectionGuide').textContent=selected?.writingGuide||''}
+async function refreshAcceptedPolicyContent(){if(!state.acceptedPolicy)return;const button=$('refreshAcceptedContent');button.disabled=true;button.textContent='正在抓取并解析附件…';try{await api(`/api/accepted-policies/${state.acceptedPolicy.id}/refresh-content`,{method:'POST'});await loadAnalysisPage();flash('政策网页与附件正文已重新抓取')}finally{button.disabled=false;button.textContent='重新抓取正文与附件'}}
+async function runPolicyAnalysis(){if(!state.acceptedPolicy)return;if(state.acceptedPolicy.contentCompleteness!=='COMPLETE')return flash('正文尚不完整，请先重新抓取正文与附件',true);if(!state.agentStatus?.available)return flash(state.agentStatus?.message||'Agent 未启用',true);const createdBy=$('analysisCreatedBy').value.trim();if(!createdBy)return flash('分析操作人不能为空',true);$('runAnalysis').disabled=true;$('analysisRunStatus').textContent='Agent 正在读取政策全文并生成分析…';try{await api(`/api/accepted-policies/${state.acceptedPolicy.id}/analyses`,{method:'POST',body:JSON.stringify({createdBy})});await loadAnalysisPage();await selectAcceptedPolicy(state.acceptedPolicyId);flash('Agent 分析已完成并保存新版本')}finally{$('runAnalysis').disabled=!state.agentStatus?.available}}
+async function confirmPolicyAnalysis(){const analysis=state.analyses.find(a=>a.id===state.analysisId);if(!analysis||analysis.runStatus!=='SUCCEEDED')return flash('请选择一个分析成功的版本',true);const reportMonth=$('contentReportMonth').value,confirmedBy=$('contentConfirmedBy').value.trim(),sectionCode=$('analysisSection').value,itemTitle=$('analysisGeneratedTitle').value.trim(),finalContent=$('analysisGeneratedContent').value.trim();if(!reportMonth)return flash('请选择月报月份',true);if(!confirmedBy)return flash('确认人不能为空',true);if(!sectionCode||!itemTitle||!finalContent)return flash('栏目、标题和正文不能为空',true);const [year,monthValue]=reportMonth.split('-').map(Number);$('confirmAnalysis').disabled=true;try{const result=await(await api(`/api/accepted-policies/${state.acceptedPolicy.id}/analyses/${analysis.id}/confirm`,{method:'POST',body:JSON.stringify({reportYear:year,reportMonth:monthValue,sectionCode,itemTitle,finalContent,confirmedBy})})).json();await selectAcceptedPolicy(state.acceptedPolicy.id);flash(`已进入“${result.reportTitle}”内容池，条目 #${result.reportItemId}`)}finally{$('confirmAnalysis').disabled=false}}
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>showView(b.dataset.view)));$('refreshTasksBtn').addEventListener('click',()=>loadTasks().catch(e=>flash(e.message,true)));$('refreshCandidates').addEventListener('click',()=>loadReview().catch(e=>flash(e.message,true)));$('runSearch').addEventListener('click',runSearch);$('selectAll').addEventListener('click',()=>document.querySelectorAll('input[name="sourceId"]').forEach(i=>i.checked=true));$('clearAll').addEventListener('click',()=>document.querySelectorAll('input[name="sourceId"]').forEach(i=>i.checked=false));$('taskList').addEventListener('click',e=>{const n=e.target.closest('[data-task]');if(n)openReview(n.dataset.task).catch(x=>flash(x.message,true))});$('candidateList').addEventListener('click',e=>{const n=e.target.closest('[data-policy]');if(n)selectCandidate(n.dataset.policy).catch(x=>flash(x.message,true))});$('reviewTask').addEventListener('change',e=>{state.taskId=e.target.value?Number(e.target.value):null;state.policyId=null;loadReview().catch(x=>flash(x.message,true))});$('applyFilter').addEventListener('click',()=>{state.policyId=null;loadReview().catch(e=>flash(e.message,true))});$('savePolicy').addEventListener('click',()=>savePolicy().catch(e=>flash(e.message,true)));$('accept').addEventListener('click',()=>review('accept').catch(e=>flash(e.message,true)));$('reject').addEventListener('click',()=>review('reject').catch(e=>flash(e.message,true)));$('defer').addEventListener('click',()=>review('defer').catch(e=>flash(e.message,true)));$('pending').addEventListener('click',()=>review('pending').catch(e=>flash(e.message,true)));
+document.querySelectorAll('.nav button').forEach(b=>b.addEventListener('click',()=>{if(b.dataset.view==='analysis')loadAnalysisPage().catch(e=>flash(e.message,true))}));$('refreshAccepted').addEventListener('click',()=>loadAnalysisPage().catch(e=>flash(e.message,true)));$('refreshAcceptedContent').addEventListener('click',()=>refreshAcceptedPolicyContent().catch(e=>flash(e.message,true)));$('acceptedPolicyList').addEventListener('click',e=>{const n=e.target.closest('[data-accepted-policy]');if(n)selectAcceptedPolicy(n.dataset.acceptedPolicy).catch(x=>flash(x.message,true))});$('analysisHistory').addEventListener('change',e=>{state.analysisId=e.target.value?Number(e.target.value):null;renderAnalysisVersion(state.analyses.find(a=>a.id===state.analysisId)||null)});$('analysisSection').addEventListener('change',updateSectionGuide);$('runAnalysis').addEventListener('click',()=>runPolicyAnalysis().catch(e=>flash(e.message,true)));$('confirmAnalysis').addEventListener('click',()=>confirmPolicyAnalysis().catch(e=>flash(e.message,true)));
+const today=new Date(),month=localDate(today).slice(0,7),initialView=['#review','#analysis','#report-editor','#generation'].includes(location.hash)?location.hash.slice(1):'search';$('reportMonth').value=month;$('startDate').value=`${month}-01`;$('endDate').value=localDate(today);$('contentReportMonth').value=month;showView(initialView,false);Promise.all([loadSources(),loadTasks(),initialView==='analysis'?loadAnalysisPage():Promise.resolve()]).catch(e=>flash(e.message,true));
+function showView(name,hash=true){const view=['search','review','analysis','report-editor','generation'].includes(name)?name:'search';$('searchView').hidden=view!=='search';$('reviewView').hidden=view!=='review';$('analysisView').hidden=view!=='analysis';$('reportEditorView').hidden=view!=='report-editor';$('generationView').hidden=view!=='generation';document.querySelectorAll('.nav button').forEach(b=>b.classList.toggle('active',b.dataset.view===view));if(hash)history.replaceState(null,'',`#${view}`)}
+const reportStatusText=s=>({DRAFT:'草稿编辑中',CONTENT_CONFIRMED:'整月内容已确认',GENERATED:'正式 Word 已生成',ARCHIVED:'已归档',CONFIRMED:'已确认',REMOVED:'已删除',EDITED:'人工编辑',REORDERED:'调整顺序',RESTORED:'恢复条目',ANALYSIS_CONFIRMED:'分析结果确认入池'})[s]||statusText(s);
+function requireReportOperator(){const value=$('reportOperator').value.trim();if(!value){flash('当前操作人不能为空',true);return null}return value}
+function setReportEditor(editor){state.reportEditor=editor;const exists=[...(editor.sections||[]).flatMap(s=>s.items||[])].some(item=>item.id===state.reportItemId);if(!exists)state.reportItemId=null;renderReportEditor()}
+async function loadReportEditor(){const period=$('editorReportMonth').value;if(!period)return flash('请选择月报月份',true);const [reportYear,reportMonth]=period.split('-').map(Number);if(!state.reportEditor||state.reportPeriod!==period){const workspace=await(await api('/api/monthly-reports',{method:'POST',body:JSON.stringify({reportYear,reportMonth})})).json();state.reportId=workspace.report.id;state.reportPeriod=period}setReportEditor(await(await api(`/api/monthly-reports/${state.reportId}/editor`)).json());$('headerStatus').textContent=`${state.reportEditor.title} · ${reportStatusText(state.reportEditor.status)}`}
+function renderReportEditor(){const report=state.reportEditor;if(!report){$('reportEditorEmpty').hidden=false;$('reportEditorPanel').hidden=true;return}$('reportEditorEmpty').hidden=true;$('reportEditorPanel').hidden=false;$('reportEditorTitle').textContent=report.title;$('reportEditorState').textContent=`${report.activeItemCount} 条 · ${reportStatusText(report.status)}`;const writable=(report.sections||[]).filter(s=>s.writable);$('reportItemSection').innerHTML=writable.map(s=>`<option value="${esc(s.sectionCode)}">${esc(s.sectionName)}</option>`).join('');$('reportSectionList').innerHTML=(report.sections||[]).map(s=>s.writable?`<div class="report-section"><div class="report-section-head"><strong>${esc(s.sectionName)}</strong><span class="muted">${esc(s.writingGuide||'')}</span></div><div class="report-items">${(s.items||[]).map(item=>`<button class="report-item ${item.id===state.reportItemId?'active':''}" data-report-item="${item.id}"><div class="title">${esc(item.itemTitle||`条目 #${item.id}`)}</div><div class="meta">#${item.id} · ${reportStatusText(item.status)} · 修订 ${item.revisions?.length||0}</div></button>`).join('')||'<div class="muted">本栏目暂无内容</div>'}</div></div>`:`<div class="report-group">${esc(s.sectionName)}</div>`).join('');$('removedItemCount').textContent=`${report.removedItems?.length||0} 条`;$('removedItemList').innerHTML=(report.removedItems||[]).map(item=>`<div class="removed-item"><span><strong>${esc(item.itemTitle||`条目 #${item.id}`)}</strong><span class="muted"> · ${esc(item.sectionCode||'未知栏目')}</span></span><button class="btn" data-restore-item="${item.id}">恢复</button></div>`).join('')||'<div class="muted">暂无已删除内容</div>';const banner=$('reportStatusBanner');banner.className=`report-banner${report.status==='DRAFT'&&!report.canConfirm?' blocked':''}`;banner.innerHTML=report.status==='DRAFT'?(report.canConfirm?'✓ 内容校验通过，可由负责人执行整月确认。':`尚不能整月确认：${(report.validationErrors||[]).map(esc).join('；')}`):report.status==='CONTENT_CONFIRMED'?`✓ 已由 ${esc(report.contentConfirmedBy||'负责人')} 于 ${esc(report.contentConfirmedAt||'')} 完成整月确认，Word 生成门禁已开放。`:`当前状态：${reportStatusText(report.status)}。如需修改，请先重新打开编辑。`;$('confirmReportContent').hidden=report.status!=='DRAFT';$('confirmReportContent').disabled=!report.canConfirm;$('reopenReportContent').hidden=report.status==='DRAFT'||report.status==='ARCHIVED';renderReportItem()}
+function reportItemById(){return [...(state.reportEditor?.sections||[]).flatMap(s=>s.items||[])].find(item=>item.id===state.reportItemId)||null}
+function renderReportItem(){const item=reportItemById();if(!item){$('reportItemEmpty').hidden=false;$('reportItemPanel').hidden=true;$('reportItemState').textContent='';return}$('reportItemEmpty').hidden=true;$('reportItemPanel').hidden=false;const locked=state.reportEditor.status!=='DRAFT';$('reportLockedNote').hidden=!locked;$('reportItemState').textContent=`条目 #${item.id} · ${reportStatusText(item.status)} · 版本 ${item.lockVersion}`;$('reportItemSection').value=item.sectionCode||'';$('reportItemTitle').value=item.itemTitle||'';$('reportItemContent').value=item.finalContent||'';$('reportAgentDraft').textContent=item.agentDraft||'未保存 Agent 初稿';$('reportItemSources').innerHTML=(item.sources||[]).map(source=>`<div class="history-item"><a href="${esc(source.sourceUrl||'#')}" target="_blank" rel="noopener noreferrer">${esc(source.sourceTitle||'查看政府原文')}</a><br><span class="muted">政策 #${source.policyId||'-'} · 快照 ${source.snapshotLength||0} 字</span></div>`).join('')||'<div class="muted">暂无来源记录</div>';$('reportRevisionList').innerHTML=(item.revisions||[]).map(revision=>`<div class="history-item"><strong>v${revision.revisionNo} · ${reportStatusText(revision.changeType)}</strong> ${esc(revision.editor||'')} · ${esc(revision.createdAt||'')}<br><span class="muted">${esc(revision.changeNote||'')}</span><div class="revision-content">${esc(revision.content||'')}</div></div>`).join('')||'<div class="muted">暂无修订记录</div>';const section=state.reportEditor.sections.find(s=>s.sectionCode===$('reportItemSection').value);$('reportSectionGuide').textContent=section?.writingGuide||'';['reportItemSection','reportItemTitle','reportItemContent','saveReportItem','moveReportItemUp','moveReportItemDown','removeReportItem'].forEach(id=>$(id).disabled=locked);const items=section?.items||[],index=items.findIndex(v=>v.id===item.id);$('moveReportItemUp').disabled=locked||index<=0;$('moveReportItemDown').disabled=locked||index<0||index>=items.length-1}
+async function saveReportItem(){const item=reportItemById(),operator=requireReportOperator();if(!item||!operator)return;const payload={sectionCode:$('reportItemSection').value,itemTitle:$('reportItemTitle').value.trim(),finalContent:$('reportItemContent').value.trim(),editor:operator,lockVersion:item.lockVersion};if(!payload.itemTitle||!payload.finalContent)return flash('标题和最终正文不能为空',true);setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/items/${item.id}`,{method:'PUT',body:JSON.stringify(payload)})).json());flash('月报条目已保存并生成修订记录')}
+async function moveReportItem(delta){const item=reportItemById(),operator=requireReportOperator();if(!item||!operator)return;const section=state.reportEditor.sections.find(s=>s.sectionCode===item.sectionCode),ids=(section?.items||[]).map(v=>v.id),index=ids.indexOf(item.id),target=index+delta;if(index<0||target<0||target>=ids.length)return;[ids[index],ids[target]]=[ids[target],ids[index]];setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/sections/${encodeURIComponent(item.sectionCode)}/reorder`,{method:'POST',body:JSON.stringify({orderedItemIds:ids,editor:operator})})).json());flash('栏目内顺序已更新')}
+async function removeReportItem(){const item=reportItemById(),operator=requireReportOperator();if(!item||!operator)return;setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/items/${item.id}/remove`,{method:'POST',body:JSON.stringify({operator,reason:'从月报内容编辑页面删除'})})).json());flash('条目已移入已删除内容，可随时恢复')}
+async function restoreReportItem(itemId){const operator=requireReportOperator();if(!operator)return;state.reportItemId=Number(itemId);setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/items/${itemId}/restore`,{method:'POST',body:JSON.stringify({operator,reason:'从月报内容编辑页面恢复'})})).json());flash('条目已恢复到原栏目')}
+async function confirmReportContent(){const operator=requireReportOperator();if(!operator)return;setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/confirm-content`,{method:'POST',body:JSON.stringify({operator,reason:'整月内容人工确认'})})).json());flash('整月内容已确认，正式 Word 生成门禁已开放')}
+async function reopenReportContent(){const operator=requireReportOperator();if(!operator)return;setReportEditor(await(await api(`/api/monthly-reports/${state.reportEditor.reportId}/reopen`,{method:'POST',body:JSON.stringify({operator,reason:'人工重新打开编辑'})})).json());flash('月报已重新打开编辑，需再次整月确认后才能生成 Word')}
+document.querySelector('[data-view="report-editor"]').addEventListener('click',()=>loadReportEditor().catch(e=>flash(e.message,true)));$('editorReportMonth').value=month;$('loadReportEditor').addEventListener('click',()=>loadReportEditor().catch(e=>flash(e.message,true)));$('refreshReportEditor').addEventListener('click',()=>loadReportEditor().catch(e=>flash(e.message,true)));$('reportSectionList').addEventListener('click',e=>{const node=e.target.closest('[data-report-item]');if(node){state.reportItemId=Number(node.dataset.reportItem);renderReportEditor()}});$('removedItemList').addEventListener('click',e=>{const node=e.target.closest('[data-restore-item]');if(node)restoreReportItem(node.dataset.restoreItem).catch(x=>flash(x.message,true))});$('reportItemSection').addEventListener('change',()=>{const section=state.reportEditor?.sections.find(s=>s.sectionCode===$('reportItemSection').value);$('reportSectionGuide').textContent=section?.writingGuide||''});$('saveReportItem').addEventListener('click',()=>saveReportItem().catch(e=>flash(e.message,true)));$('moveReportItemUp').addEventListener('click',()=>moveReportItem(-1).catch(e=>flash(e.message,true)));$('moveReportItemDown').addEventListener('click',()=>moveReportItem(1).catch(e=>flash(e.message,true)));$('removeReportItem').addEventListener('click',()=>removeReportItem().catch(e=>flash(e.message,true)));$('confirmReportContent').addEventListener('click',()=>confirmReportContent().catch(e=>flash(e.message,true)));$('reopenReportContent').addEventListener('click',()=>reopenReportContent().catch(e=>flash(e.message,true)));if(location.hash==='#report-editor'){showView('report-editor',false);loadReportEditor().catch(e=>flash(e.message,true))}
+function generationStatusMessage(report){if(!report)return '该月份尚未创建月报，请先在“月报内容编辑”页面加载或创建。';if(report.status==='CONTENT_CONFIRMED')return `✓ ${esc(report.contentConfirmedBy||'负责人')} 已完成人工确认，正式 Word 生成门禁已开放。`;if(report.status==='GENERATED')return '本月正式 Word 已生成并归档。如需产生新版本，请返回内容编辑页面重新打开、修改并再次整月确认。';if(report.status==='DRAFT')return `尚不能生成：${(report.validationErrors||[]).map(esc).join('；')||'月报内容仍处于草稿状态，必须先完成整月人工确认。'}`;return `当前状态为 ${reportStatusText(report.status)}，暂不允许生成正式 Word。`}
+function renderGenerationPage(){const report=state.generationReport;if(!report){$('generationEmpty').hidden=false;$('generationPanel').hidden=true;$('generationEmpty').textContent=generationStatusMessage(null);return}$('generationEmpty').hidden=true;$('generationPanel').hidden=false;const ready=report.status==='CONTENT_CONFIRMED';$('generationReportTitle').textContent=report.title||`${report.reportYear}年${report.reportMonth}月月报`;$('generationItemCount').textContent=report.activeItemCount||0;$('generationArchiveCount').textContent=state.generationHistory.length;$('generationState').textContent=reportStatusText(report.status);$('generationBanner').className=`report-banner${ready?'':' blocked'}`;$('generationBanner').innerHTML=generationStatusMessage(report);$('generateMonthlyReport').disabled=!ready;$('generationHistory').innerHTML=state.generationHistory.map(g=>`<div class="generation-entry"><div><strong>第 ${g.generationNo} 版 · ${esc(g.fileName)}</strong><div class="meta">${esc(g.createdAt||'')} · 操作人 ${esc(g.generatedBy||'')} · 当年第 ${g.issueNo} 期 / 总第 ${g.totalIssueNo} 期 · ${Math.max(1,Math.round((g.fileSize||0)/1024))} KB</div><div class="generation-hash">SHA-256：${esc(g.sha256||'')}</div></div><button class="btn" data-download-generation="${g.id}">重新下载</button></div>`).join('')||'<div class="empty">暂无生成档案。完成整月确认后可生成第一个正式 Word 版本。</div>'}
+async function loadGenerationPage(){const period=$('generationReportMonth').value;if(!period)return flash('请选择月报月份',true);$('headerStatus').textContent='正在加载月报生成状态…';const [year,monthValue]=period.split('-').map(Number);const reports=await(await api('/api/monthly-reports')).json();const existing=reports.find(r=>Number(r.reportYear)===year&&Number(r.reportMonth)===monthValue);if(!existing){state.generationReport=null;state.generationHistory=[];renderGenerationPage();$('headerStatus').textContent='该月份尚未创建月报';return}const [editor,history]=await Promise.all([(await api(`/api/monthly-reports/${existing.id}/editor`)).json(),(await api(`/api/reports/monthly/${existing.id}/generations`)).json()]);state.generationReport=editor;state.generationHistory=history;renderGenerationPage();$('headerStatus').textContent=`${editor.title} · ${reportStatusText(editor.status)}`}
+function responseFileName(response,fallback){const disposition=response.headers.get('Content-Disposition')||'';const utf8=disposition.match(/filename\*=UTF-8''([^;]+)/i);if(utf8){try{return decodeURIComponent(utf8[1])}catch(_){}}const plain=disposition.match(/filename="?([^";]+)"?/i);return plain?.[1]||fallback}
+async function saveWordResponse(response,fallback){const blob=await response.blob(),url=URL.createObjectURL(blob),anchor=document.createElement('a');anchor.href=url;anchor.download=responseFileName(response,fallback);document.body.appendChild(anchor);anchor.click();anchor.remove();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+async function generateMonthlyReport(){const report=state.generationReport;if(!report||report.status!=='CONTENT_CONFIRMED')return flash('只有整月内容已人工确认的月报才允许生成',true);const issueNo=Number($('generationIssueNo').value),totalIssueNo=Number($('generationTotalIssueNo').value),reportTo=$('generationReportTo').value.trim(),sendTo=$('generationSendTo').value.trim(),contactInfo=$('generationContactInfo').value.trim(),generatedBy=$('generationGeneratedBy').value.trim();if(!Number.isInteger(issueNo)||issueNo<1||!Number.isInteger(totalIssueNo)||totalIssueNo<issueNo)return flash('期号必须大于 0，且总期号不能小于当年期号',true);if(!reportTo||!sendTo||!contactInfo||!generatedBy)return flash('报送单位、抄送单位、联系方式和操作人均不能为空',true);const button=$('generateMonthlyReport');button.disabled=true;button.textContent='正在填充原始模板…';try{const response=await api('/api/reports/monthly',{method:'POST',body:JSON.stringify({reportId:report.reportId,issueNo,totalIssueNo,reportTo,sendTo,contactInfo,generatedBy})});await saveWordResponse(response,`${report.title}.docx`);await loadGenerationPage();flash('正式月报已生成、下载并归档，可在右侧随时重新下载')}finally{button.textContent='填充模板并下载正式 Word';button.disabled=state.generationReport?.status!=='CONTENT_CONFIRMED'}}
+async function downloadGenerationArchive(generationId){const report=state.generationReport;if(!report)return;const response=await api(`/api/reports/monthly/${report.reportId}/generations/${generationId}/download`);await saveWordResponse(response,`${report.title}.docx`);flash('历史 Word 版本已下载')}
+document.querySelector('[data-view="generation"]').addEventListener('click',()=>loadGenerationPage().catch(e=>flash(e.message,true)));$('generationReportMonth').value=month;$('loadGeneration').addEventListener('click',()=>loadGenerationPage().catch(e=>flash(e.message,true)));$('refreshGeneration').addEventListener('click',()=>loadGenerationPage().catch(e=>flash(e.message,true)));$('generateMonthlyReport').addEventListener('click',()=>generateMonthlyReport().catch(e=>flash(e.message,true)));$('generationHistory').addEventListener('click',e=>{const node=e.target.closest('[data-download-generation]');if(node)downloadGenerationArchive(node.dataset.downloadGeneration).catch(x=>flash(x.message,true))});$('goReportEditor').addEventListener('click',()=>{$('editorReportMonth').value=$('generationReportMonth').value;showView('report-editor');loadReportEditor().catch(e=>flash(e.message,true))});if(location.hash==='#generation'){showView('generation',false);loadGenerationPage().catch(e=>flash(e.message,true))}</script>
 </body>
 </html>

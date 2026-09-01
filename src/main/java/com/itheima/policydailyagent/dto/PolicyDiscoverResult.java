@@ -16,7 +16,6 @@ public record PolicyDiscoverResult(
 
         int failedCount,
 
-        int summarizedCount,
 
         List<String> savedTitles,
 
