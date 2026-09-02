@@ -5,6 +5,7 @@ import com.itheima.policydailyagent.domain.search.SearchTask;
 import com.itheima.policydailyagent.domain.search.SearchTaskStatus;
 import com.itheima.policydailyagent.dto.SearchTaskRunRequest;
 import com.itheima.policydailyagent.service.SearchTaskService;
+import com.itheima.policydailyagent.service.memory.AgentTaskMemoryService;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
@@ -52,12 +53,14 @@ class PolicySearchOrchestratorTests {
         completed.setStatus(SearchTaskStatus.COMPLETED);
         when(taskService.complete(eq(1L), eq(2), eq(2), eq(0), eq(0), eq(0)))
                 .thenReturn(completed);
+        AgentTaskMemoryService memoryService = mock(AgentTaskMemoryService.class);
 
         PolicySearchOrchestrator orchestrator = new PolicySearchOrchestrator(
                 properties,
                 List.of(adapter),
                 ingestService,
-                taskService
+                taskService,
+                memoryService
         );
         var result = orchestrator.run(new SearchTaskRunRequest(
                 "八月检索",
@@ -75,6 +78,55 @@ class PolicySearchOrchestratorTests {
         assertThat(result.associatedCount()).isEqualTo(2);
         verify(adapter, times(2)).discover(anyString(), anyList(), eq(5), anyBoolean());
         verify(ingestService, times(2)).ingest(eq(running), any(), any(), anyInt());
+
+        verify(memoryService).initialize(running);
+        verify(memoryService).markStarted(1L);
+        verify(memoryService, times(2))
+                .recordSourceSearched(eq(1L), eq(1), anyString(), anyString(), any());
+        verify(memoryService).recordRoundCompleted(eq(1L), any());
+        verify(memoryService).markCompleted(eq(1L), any());
+    }
+
+    @Test
+    void memoryRecordingFailureDoesNotBreakSearchCompletion() {
+        PolicySourceProperties properties = new PolicySourceProperties();
+        properties.setItems(List.of(source("gov", "中国政府网", "https://www.gov.cn/zhengce/zuixin/")));
+        PolicySiteAdapter adapter = mock(PolicySiteAdapter.class);
+        when(adapter.supports(anyString())).thenReturn(true);
+        when(adapter.discover(anyString(), anyList(), eq(5), anyBoolean()))
+                .thenReturn(List.of(new PolicySiteAdapter.DiscoveredPolicyLink(
+                        "人工智能政策", "https://www.gov.cn/zhengce/zuixin/art/2026/policy.html", "政策片段")));
+        PolicyCandidateIngestService ingestService = mock(PolicyCandidateIngestService.class);
+        when(ingestService.ingest(any(), any(), any(), anyInt()))
+                .thenReturn(new PolicyCandidateIngestService.IngestOutcome(
+                        PolicyCandidateIngestService.ResultType.SAVED, 10L, true, "已入库"));
+        SearchTaskService taskService = mock(SearchTaskService.class);
+        SearchTask running = new SearchTask();
+        running.setId(1L);
+        running.setStatus(SearchTaskStatus.RUNNING);
+        when(taskService.createAndStart(any(SearchTaskRunRequest.class), anyList(), anyList()))
+                .thenReturn(running);
+        SearchTask completed = new SearchTask();
+        completed.setId(1L);
+        completed.setStatus(SearchTaskStatus.COMPLETED);
+        when(taskService.complete(eq(1L), eq(1), eq(1), eq(0), eq(0), eq(0)))
+                .thenReturn(completed);
+        AgentTaskMemoryService memoryService = mock(AgentTaskMemoryService.class);
+        doThrow(new RuntimeException("内存写入失败"))
+                .when(memoryService).recordSourceSearched(eq(1L), eq(1), anyString(), anyString(), any());
+        doThrow(new RuntimeException("内存写入失败"))
+                .when(memoryService).markCompleted(eq(1L), any());
+
+        PolicySearchOrchestrator orchestrator = new PolicySearchOrchestrator(
+                properties, List.of(adapter), ingestService, taskService, memoryService);
+        var result = orchestrator.run(new SearchTaskRunRequest(
+                "八月检索", "2026-08",
+                LocalDate.of(2026, 8, 1), LocalDate.of(2026, 8, 31),
+                List.of("人工智能"), List.of("gov"), 5, true));
+
+        assertThat(result.status()).isEqualTo(SearchTaskStatus.COMPLETED);
+        assertThat(result.savedCount()).isEqualTo(1);
+        verify(taskService).complete(eq(1L), eq(1), eq(1), eq(0), eq(0), eq(0));
     }
 
     private PolicySourceProperties.Item source(String id, String name, String url) {

@@ -6,6 +6,7 @@ import com.itheima.policydailyagent.dto.PolicyDiscoverRequest;
 import com.itheima.policydailyagent.dto.SearchTaskRunRequest;
 import com.itheima.policydailyagent.repository.SearchTaskPolicyRepository;
 import com.itheima.policydailyagent.repository.SearchTaskRepository;
+import com.itheima.policydailyagent.service.memory.AgentTaskMemoryService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,13 +19,16 @@ public class SearchTaskService {
 
     private final SearchTaskRepository searchTaskRepository;
     private final SearchTaskPolicyRepository searchTaskPolicyRepository;
+    private final AgentTaskMemoryService memoryService;
 
     public SearchTaskService(
             SearchTaskRepository searchTaskRepository,
-            SearchTaskPolicyRepository searchTaskPolicyRepository
+            SearchTaskPolicyRepository searchTaskPolicyRepository,
+            AgentTaskMemoryService memoryService
     ) {
         this.searchTaskRepository = searchTaskRepository;
         this.searchTaskPolicyRepository = searchTaskPolicyRepository;
+        this.memoryService = memoryService;
     }
 
     @Transactional
@@ -104,6 +108,7 @@ public class SearchTaskService {
             throw new IllegalStateException("任务正在执行中，暂不能删除，请等待完成后重试。");
         }
         searchTaskPolicyRepository.deleteBySearchTaskId(taskId);
+        memoryService.deleteForSearchTask(taskId);
         searchTaskRepository.deleteById(taskId);
     }
 
