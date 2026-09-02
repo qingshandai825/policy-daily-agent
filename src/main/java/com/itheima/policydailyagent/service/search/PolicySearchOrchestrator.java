@@ -49,6 +49,7 @@ public class PolicySearchOrchestrator {
         List<PolicySourceProperties.Item> sources = resolveSources(sourceIds);
         int maxLinks = Math.min(Math.max(request.maxLinksPerSource() == null
                 ? 10 : request.maxLinksPerSource(), 1), 50);
+        boolean filterByKeyword = request.filterByKeyword() == null || request.filterByKeyword();
 
         SearchTask task = searchTaskService.createAndStart(request, keywords, sourceIds);
         MutableCounters counters = new MutableCounters();
@@ -62,7 +63,8 @@ public class PolicySearchOrchestrator {
                 List<PolicySiteAdapter.DiscoveredPolicyLink> links = adapter.discover(
                         source.getUrl(),
                         keywords,
-                        maxLinks
+                        maxLinks,
+                        filterByKeyword
                 );
                 successfulSources++;
                 counters.found += links.size();

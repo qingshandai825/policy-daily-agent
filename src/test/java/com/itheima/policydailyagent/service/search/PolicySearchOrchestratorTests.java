@@ -25,7 +25,7 @@ class PolicySearchOrchestratorTests {
         ));
         PolicySiteAdapter adapter = mock(PolicySiteAdapter.class);
         when(adapter.supports(anyString())).thenReturn(true);
-        when(adapter.discover(anyString(), anyList(), eq(5))).thenAnswer(invocation -> {
+        when(adapter.discover(anyString(), anyList(), eq(5), anyBoolean())).thenAnswer(invocation -> {
             String sourceUrl = invocation.getArgument(0);
             return List.of(new PolicySiteAdapter.DiscoveredPolicyLink(
                     "人工智能政策",
@@ -66,13 +66,14 @@ class PolicySearchOrchestratorTests {
                 LocalDate.of(2026, 8, 31),
                 List.of("人工智能"),
                 List.of("gov", "miit"),
-                5
+                5,
+                true
         ));
 
         assertThat(result.status()).isEqualTo(SearchTaskStatus.COMPLETED);
         assertThat(result.foundCount()).isEqualTo(2);
         assertThat(result.associatedCount()).isEqualTo(2);
-        verify(adapter, times(2)).discover(anyString(), anyList(), eq(5));
+        verify(adapter, times(2)).discover(anyString(), anyList(), eq(5), anyBoolean());
         verify(ingestService, times(2)).ingest(eq(running), any(), any(), anyInt());
     }
 

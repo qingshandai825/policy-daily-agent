@@ -41,6 +41,7 @@ public class PolicyDocumentService {
         document.setSourceName(request.sourceName());
         document.setPublishDate(request.publishDate());
         document.setSourceUrl(request.sourceUrl());
+        document.setStatus("RAW");
         document.setContent(request.content());
         document.setCleanedContent(hasText(request.cleanedContent())
                 ? request.cleanedContent()

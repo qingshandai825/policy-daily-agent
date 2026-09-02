@@ -1,7 +1,7 @@
 package com.itheima.policydailyagent.service;
 
 import com.itheima.policydailyagent.dto.PolicyCrawlResult;
-import org.jsoup.Jsoup;
+import com.itheima.policydailyagent.service.PolicyHttpFetcher;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -35,12 +35,8 @@ public class PolicyCrawlerService {
         }
 
         try {
-            Document document = Jsoup.connect(url)
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
+            Document document = PolicyHttpFetcher.connect(url)
                     .referrer("https://www.baidu.com/")
-                    .timeout(15000)
-                    .followRedirects(true)
-                    .maxBodySize(0)
                     .get();
 
             String title = extractTitle(document);

@@ -32,7 +32,8 @@ class GenericGovernmentSiteAdapterTests {
                 sourceUrl,
                 html,
                 List.of("人工智能"),
-                10
+                10,
+                true
         );
 
         assertThat(links).hasSize(1);

@@ -13,4 +13,6 @@ public interface SearchTaskPolicyRepository extends JpaRepository<SearchTaskPoli
     Optional<SearchTaskPolicy> findBySearchTaskIdAndPolicyId(Long searchTaskId, Long policyId);
 
     List<SearchTaskPolicy> findBySearchTaskIdOrderByDiscoveryOrderAscIdAsc(Long searchTaskId);
+
+    void deleteBySearchTaskId(Long searchTaskId);
 }

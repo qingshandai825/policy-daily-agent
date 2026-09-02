@@ -51,4 +51,14 @@ public class SearchTaskController {
     public ResponseEntity<List<SearchTask>> listRecentTasks() {
         return ResponseEntity.ok(searchTaskService.listRecentTasks());
     }
+
+    @DeleteMapping("/{taskId}")
+    public ResponseEntity<?> deleteTask(@PathVariable Long taskId) {
+        try {
+            searchTaskService.deleteTask(taskId);
+            return ResponseEntity.ok(Map.of("message", "搜索任务已删除"));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
 }

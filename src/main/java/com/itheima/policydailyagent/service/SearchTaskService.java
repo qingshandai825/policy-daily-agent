@@ -1,8 +1,10 @@
 package com.itheima.policydailyagent.service;
 
 import com.itheima.policydailyagent.domain.search.SearchTask;
+import com.itheima.policydailyagent.domain.search.SearchTaskStatus;
 import com.itheima.policydailyagent.dto.PolicyDiscoverRequest;
 import com.itheima.policydailyagent.dto.SearchTaskRunRequest;
+import com.itheima.policydailyagent.repository.SearchTaskPolicyRepository;
 import com.itheima.policydailyagent.repository.SearchTaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,9 +17,14 @@ import java.util.List;
 public class SearchTaskService {
 
     private final SearchTaskRepository searchTaskRepository;
+    private final SearchTaskPolicyRepository searchTaskPolicyRepository;
 
-    public SearchTaskService(SearchTaskRepository searchTaskRepository) {
+    public SearchTaskService(
+            SearchTaskRepository searchTaskRepository,
+            SearchTaskPolicyRepository searchTaskPolicyRepository
+    ) {
         this.searchTaskRepository = searchTaskRepository;
+        this.searchTaskPolicyRepository = searchTaskPolicyRepository;
     }
 
     @Transactional
@@ -87,6 +94,17 @@ public class SearchTaskService {
     @Transactional(readOnly = true)
     public List<SearchTask> listRecentTasks() {
         return searchTaskRepository.findTop20ByOrderByCreatedAtDesc();
+    }
+
+    @Transactional
+    public void deleteTask(Long taskId) {
+        SearchTask task = searchTaskRepository.findById(taskId)
+                .orElseThrow(() -> new IllegalArgumentException("搜索任务不存在，id=" + taskId));
+        if (task.getStatus() == SearchTaskStatus.RUNNING) {
+            throw new IllegalStateException("任务正在执行中，暂不能删除，请等待完成后重试。");
+        }
+        searchTaskPolicyRepository.deleteBySearchTaskId(taskId);
+        searchTaskRepository.deleteById(taskId);
     }
 
     private String resolveTaskName(PolicyDiscoverRequest request) {

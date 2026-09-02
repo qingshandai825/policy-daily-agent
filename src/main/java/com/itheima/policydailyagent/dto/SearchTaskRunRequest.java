@@ -10,6 +10,7 @@ public record SearchTaskRunRequest(
         LocalDate targetEndDate,
         List<String> keywords,
         List<String> sourceIds,
-        Integer maxLinksPerSource
+        Integer maxLinksPerSource,
+        Boolean filterByKeyword
 ) {
 }

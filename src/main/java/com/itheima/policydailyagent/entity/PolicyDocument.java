@@ -150,6 +150,13 @@ public class PolicyDocument {
     @Column(name = "analysis_status", nullable = false, length = 30)
     private PolicyAnalysisStatus analysisStatus = PolicyAnalysisStatus.NOT_ANALYZED;
 
+    /**
+     * 文档生命周期状态（旧基线字段，保留以兼容既有表结构）。
+     * 候选入库时统一标记为 RAW（原始抓取文档），后续由 review_status 驱动流转。
+     */
+    @Column(name = "status", nullable = false, length = 50)
+    private String status = "RAW";
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -315,6 +322,14 @@ public class PolicyDocument {
 
     public void setAnalysisStatus(PolicyAnalysisStatus analysisStatus) {
         this.analysisStatus = analysisStatus;
+    }
+
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
     }
 
     public void setSearchTaskId(Long searchTaskId) {

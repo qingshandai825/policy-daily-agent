@@ -9,7 +9,8 @@ public interface PolicySiteAdapter {
     List<DiscoveredPolicyLink> discover(
             String sourceUrl,
             List<String> keywords,
-            int maxLinks
+            int maxLinks,
+            boolean filterByKeyword
     );
 
     record DiscoveredPolicyLink(

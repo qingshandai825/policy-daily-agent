@@ -5,6 +5,11 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.itheima.policydailyagent.service.PolicyHttpFetcher;
+
+import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -17,6 +22,8 @@ public class GenericGovernmentSiteAdapter implements PolicySiteAdapter {
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36";
+
+    private static final ObjectMapper MAPPER = new ObjectMapper();
 
     @Override
     public boolean supports(String sourceUrl) {
@@ -35,40 +42,105 @@ public class GenericGovernmentSiteAdapter implements PolicySiteAdapter {
     public List<DiscoveredPolicyLink> discover(
             String sourceUrl,
             List<String> keywords,
-            int maxLinks
+            int maxLinks,
+            boolean filterByKeyword
     ) {
         if (!supports(sourceUrl)) {
             throw new IllegalArgumentException("仅允许采集政府网站栏目页：" + sourceUrl);
         }
         try {
-            Document document = Jsoup.connect(sourceUrl)
-                    .userAgent(USER_AGENT)
+            // 政府栏目页多为前端渲染，静态 HTML 不含文章链接。
+            // 对已知的列表页（如“最新政策”）改用官方 JSON 数据接口。
+            String govJson = resolveGovListingJson(sourceUrl);
+            if (govJson != null) {
+                String body = PolicyHttpFetcher.connect(govJson)
+                        .ignoreContentType(true)
+                        .maxBodySize(0)
+                        .execute()
+                        .body();
+                return discoverFromGovJson(body, keywords, maxLinks, filterByKeyword);
+            }
+            Document document = PolicyHttpFetcher.connect(sourceUrl)
                     .referrer("https://www.gov.cn/")
-                    .timeout(15000)
-                    .followRedirects(true)
-                    .maxBodySize(0)
                     .get();
-            return discoverFromDocument(sourceUrl, document, keywords, maxLinks);
+            return discoverFromDocument(sourceUrl, document, keywords, maxLinks, filterByKeyword);
         } catch (Exception e) {
             throw new RuntimeException("固定信源栏目页解析失败：" + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 已知中国政府网栏目页配套的数据接口。
+     * 例：https://www.gov.cn/zhengce/zuixin/  ->  .../ZUIXINZHENGCE.json
+     */
+    private String resolveGovListingJson(String sourceUrl) {
+        String lower = sourceUrl.toLowerCase(Locale.ROOT);
+        if (lower.contains("/zhengce/zuixin")) {
+            return withTrailingSlash(canonicalize(sourceUrl)) + "ZUIXINZHENGCE.json";
+        }
+        return null;
+    }
+
+    private String withTrailingSlash(String value) {
+        return value.endsWith("/") ? value : value + "/";
+    }
+
+    private List<DiscoveredPolicyLink> discoverFromGovJson(
+            String json,
+            List<String> keywords,
+            int maxLinks,
+            boolean filterByKeyword
+    ) throws IOException {
+        int limit = Math.max(1, maxLinks);
+        JsonNode root = MAPPER.readTree(json);
+        if (!root.isArray()) {
+            return List.of();
+        }
+        Map<String, DiscoveredPolicyLink> discovered = new LinkedHashMap<>();
+        for (JsonNode node : root) {
+            String title = text(node, "TITLE");
+            String url = canonicalize(text(node, "URL"));
+            String sub = text(node, "SUB_TITLE");
+            String date = text(node, "DOCRELPUBTIME");
+            if (!hasText(url) || !isLikelyArticleUrl(url)) {
+                continue;
+            }
+            String snippet = ((hasText(sub) ? sub : "")
+                    + (hasText(date) ? "（发布日期：" + date + "）" : "")).trim();
+            String matchText = title + " " + url + " " + sub;
+            if (filterByKeyword && !matchesKeywords(matchText, keywords)) {
+                continue;
+            }
+            discovered.putIfAbsent(url, new DiscoveredPolicyLink(title, url, snippet));
+            if (discovered.size() >= limit) {
+                break;
+            }
+        }
+        return new ArrayList<>(discovered.values());
+    }
+
+    private String text(JsonNode node, String field) {
+        JsonNode value = node.get(field);
+        return value == null ? "" : value.asText("");
     }
 
     public List<DiscoveredPolicyLink> discoverFromHtml(
             String sourceUrl,
             String html,
             List<String> keywords,
-            int maxLinks
+            int maxLinks,
+            boolean filterByKeyword
     ) {
         Document document = Jsoup.parse(html == null ? "" : html, sourceUrl);
-        return discoverFromDocument(sourceUrl, document, keywords, maxLinks);
+        return discoverFromDocument(sourceUrl, document, keywords, maxLinks, filterByKeyword);
     }
 
     private List<DiscoveredPolicyLink> discoverFromDocument(
             String sourceUrl,
             Document document,
             List<String> keywords,
-            int maxLinks
+            int maxLinks,
+            boolean filterByKeyword
     ) {
         int limit = Math.max(1, maxLinks);
         Map<String, DiscoveredPolicyLink> discovered = new LinkedHashMap<>();
@@ -83,7 +155,9 @@ public class GenericGovernmentSiteAdapter implements PolicySiteAdapter {
             if (!hasText(url) || url.equals(canonicalSource) || !isLikelyArticleUrl(url)) {
                 continue;
             }
-            if (!matchesKeywords(title + " " + url, keywords)) {
+            // 关键词匹配范围：标题 + URL + 链接所在区块的周边文本。
+            // 政府栏目页的标题往往不直书“人工智能”，而列表项的父级摘要里常含主题词。
+            if (filterByKeyword && !matchesKeywords(title + " " + url + " " + parentText(link), keywords)) {
                 continue;
             }
 
@@ -100,6 +174,15 @@ public class GenericGovernmentSiteAdapter implements PolicySiteAdapter {
             }
         }
         return new ArrayList<>(discovered.values());
+    }
+
+    private String parentText(Element link) {
+        Element parent = link.parent();
+        if (parent == null) {
+            return "";
+        }
+        String text = cleanText(parent.text());
+        return text.length() > 200 ? text.substring(0, 200) : text;
     }
 
     private boolean matchesKeywords(String text, List<String> keywords) {

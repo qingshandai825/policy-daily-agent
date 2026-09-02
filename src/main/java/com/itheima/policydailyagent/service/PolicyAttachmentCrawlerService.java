@@ -9,7 +9,6 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.jsoup.Connection;
-import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.springframework.stereotype.Service;
@@ -119,11 +118,9 @@ public class PolicyAttachmentCrawlerService {
         }
 
         try {
-            Connection.Response response = Jsoup.connect(link.sourceUrl())
-                    .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0 Safari/537.36")
+            Connection.Response response = PolicyHttpFetcher.connect(link.sourceUrl())
                     .referrer(link.sourceUrl())
                     .timeout(30_000)
-                    .followRedirects(true)
                     .ignoreContentType(true)
                     .maxBodySize(MAX_ATTACHMENT_BYTES + 1)
                     .execute();
