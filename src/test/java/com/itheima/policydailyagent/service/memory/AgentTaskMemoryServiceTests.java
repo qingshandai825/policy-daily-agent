@@ -56,6 +56,7 @@ class AgentTaskMemoryServiceTests {
         assertThat(first.getBusinessTaskId()).isEqualTo(7L);
         assertThat(first.getCurrentPhase()).isEqualTo(AgentTaskPhase.INITIALIZED);
         assertThat(first.getMemoryStatus()).isEqualTo(AgentTaskMemoryStatus.ACTIVE);
+        assertThat(first.isAutoRecovered()).isFalse();
         assertThat(first.getVersionNo()).isZero();
         // 一个 SearchTask 只能有一份当前 Memory：第二次初始化命中已存在记录，不再新建
         assertThat(second).isSameAs(existing);
@@ -197,6 +198,7 @@ class AgentTaskMemoryServiceTests {
         assertThat(view.memoryStatus()).isEqualTo(AgentTaskMemoryStatus.ACTIVE);
         assertThat(view.currentPhase()).isEqualTo(AgentTaskPhase.INITIALIZED);
         assertThat(view.summary()).contains("自动补建");
+        assertThat(view.autoRecovered()).isTrue();
         verify(memoryRepository, times(1)).save(any());
         verify(eventRepository, never()).save(any());
     }

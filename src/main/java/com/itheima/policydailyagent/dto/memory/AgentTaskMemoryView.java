@@ -19,6 +19,7 @@ public record AgentTaskMemoryView(
         AgentTaskPhase currentPhase,
         AgentTaskMemoryStatus memoryStatus,
         String summary,
+        boolean autoRecovered,
         SearchTaskMemoryContext context,
         String nextAction,
         long versionNo,

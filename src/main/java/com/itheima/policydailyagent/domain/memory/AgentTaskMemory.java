@@ -56,6 +56,9 @@ public class AgentTaskMemory {
     @Column(name = "next_action", columnDefinition = "TEXT")
     private String nextAction;
 
+    @Column(name = "auto_recovered", nullable = false)
+    private boolean autoRecovered;
+
     @Version
     @Column(name = "version_no", nullable = false)
     private long versionNo;

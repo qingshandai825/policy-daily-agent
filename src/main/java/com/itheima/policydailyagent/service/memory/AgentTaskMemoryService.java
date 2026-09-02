@@ -65,6 +65,7 @@ public class AgentTaskMemoryService {
                     memory.setCurrentPhase(AgentTaskPhase.INITIALIZED);
                     memory.setMemoryStatus(AgentTaskMemoryStatus.ACTIVE);
                     memory.setSummary("搜索任务已创建，等待开始");
+                    memory.setAutoRecovered(false);
                     memory.setContextJson(assembler.toJson(initialContext(task)));
                     memory.setNextAction("开始执行固定信源搜索");
                     return memoryRepository.save(memory);
@@ -227,6 +228,7 @@ public class AgentTaskMemoryService {
         memory.setCurrentPhase(AgentTaskPhase.INITIALIZED);
         memory.setMemoryStatus(AgentTaskMemoryStatus.ACTIVE);
         memory.setSummary("搜索任务 Memory 缺失，已自动补建（仅用于追溯，不代表搜索进度）");
+        memory.setAutoRecovered(true);
         memory.setContextJson(assembler.toJson(initialContext(task)));
         memory.setNextAction("重新运行搜索任务以恢复进度");
         return memoryRepository.save(memory);
@@ -273,6 +275,7 @@ public class AgentTaskMemoryService {
                 memory.getCurrentPhase(),
                 memory.getMemoryStatus(),
                 memory.getSummary(),
+                memory.isAutoRecovered(),
                 assembler.parseContext(memory.getContextJson()),
                 memory.getNextAction(),
                 memory.getVersionNo(),

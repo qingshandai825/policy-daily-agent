@@ -39,6 +39,7 @@ class AgentTaskMemoryPersistenceTests {
         SearchTask task = searchTaskRepository.saveAndFlush(task("并发测试"));
 
         AgentTaskMemory memory = memoryService.initialize(task);
+        assertThat(memory.isAutoRecovered()).isFalse();
         assertThat(memory.getVersionNo()).isZero();
 
         Long memoryId = memory.getId();
@@ -63,6 +64,7 @@ class AgentTaskMemoryPersistenceTests {
 
         assertThat(view.businessTaskId()).isEqualTo(task.getId());
         assertThat(view.summary()).contains("自动补建");
+        assertThat(view.autoRecovered()).isTrue();
     }
 
     private SearchTask task(String taskName) {
