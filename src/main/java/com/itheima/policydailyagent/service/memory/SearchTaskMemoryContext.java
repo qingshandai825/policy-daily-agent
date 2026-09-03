@@ -8,6 +8,10 @@ import java.util.List;
  * 只保存摘要性数据与业务对象 ID，绝不保存完整政策正文、附件或 Word 文件。
  * 由 {@link SearchTaskMemoryAssembler} 统一构建与序列化，避免各 Service
  * 手工拼接不一致的 JSON。
+ *
+ * <p>多轮搜索字段（currentRound/completedRounds/executedPlans/topicCoverage/
+ * consecutiveNoGrowthRounds/stopReason）为可选增量：旧 context_json 缺少这些
+ * 字段时可正常反序列化（引用类型为 null、基本类型为 0），保持向后兼容。
  */
 public record SearchTaskMemoryContext(
         String reportMonth,
@@ -18,7 +22,13 @@ public record SearchTaskMemoryContext(
         List<String> executedSources,
         Counts counts,
         List<Long> candidatePolicyIds,
-        List<SourceFailure> sourceFailures
+        List<SourceFailure> sourceFailures,
+        int currentRound,
+        List<Integer> completedRounds,
+        List<ExecutedPlan> executedPlans,
+        List<TopicCoverage> topicCoverage,
+        int consecutiveNoGrowthRounds,
+        String stopReason
 ) {
 
     public record Counts(int found, int saved, int duplicate, int filtered, int failed) {
@@ -32,5 +42,11 @@ public record SearchTaskMemoryContext(
     }
 
     public record SourceFailure(String sourceId, String sourceName, String message) {
+    }
+
+    public record ExecutedPlan(List<String> keywords, List<String> sources) {
+    }
+
+    public record TopicCoverage(String topic, int matchedCandidateCount, String status, List<Long> evidencePolicyIds) {
     }
 }

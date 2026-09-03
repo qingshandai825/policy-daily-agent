@@ -16,6 +16,9 @@
         TASK_STARTED: '任务开始',
         SOURCE_SEARCHED: '信源搜索完成',
         SOURCE_FAILED: '信源搜索失败',
+        ROUND_PLANNED: '本轮计划生成',
+        ROUND_STARTED: '本轮搜索开始',
+        COVERAGE_EVALUATED: '主题覆盖度评估',
         ROUND_COMPLETED: '本轮搜索完成',
         TASK_COMPLETED: '任务完成',
         TASK_FAILED: '任务失败'

@@ -12,39 +12,38 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
+/**
+ * 政策搜索编排器。负责请求校验、任务创建与启动、Memory 初始化，以及单轮/多轮模式的分发。
+ *
+ * <p>单轮模式保持原有行为（用户关键词 + 用户信源，一次性执行）；多轮模式由
+ * {@link SearchRoundService} 驱动，仅在配置启用且请求显式声明时生效（默认关闭）。
+ * 采集循环本身下沉到 {@link SearchRoundExecutor}，避免在编排器内重复堆叠。
+ */
 @Service
 public class PolicySearchOrchestrator {
 
     private static final Logger log = LoggerFactory.getLogger(PolicySearchOrchestrator.class);
 
-    private static final List<String> DEFAULT_KEYWORDS = List.of(
-            "人工智能", "大模型", "智能体", "人工智能+", "数据集", "算力",
-            "智能制造", "工业互联网", "数字化转型", "软件和信息技术"
-    );
-
-    private final PolicySourceProperties sourceProperties;
-    private final List<PolicySiteAdapter> siteAdapters;
-    private final PolicyCandidateIngestService ingestService;
     private final SearchTaskService searchTaskService;
     private final AgentTaskMemoryService memoryService;
+    private final SearchRoundExecutor roundExecutor;
+    private final SearchRoundService roundService;
+    private final MultiRoundConfig multiRoundConfig;
 
     public PolicySearchOrchestrator(
-            PolicySourceProperties sourceProperties,
-            List<PolicySiteAdapter> siteAdapters,
-            PolicyCandidateIngestService ingestService,
             SearchTaskService searchTaskService,
-            AgentTaskMemoryService memoryService
+            AgentTaskMemoryService memoryService,
+            SearchRoundExecutor roundExecutor,
+            SearchRoundService roundService,
+            MultiRoundConfig multiRoundConfig
     ) {
-        this.sourceProperties = sourceProperties;
-        this.siteAdapters = siteAdapters;
-        this.ingestService = ingestService;
         this.searchTaskService = searchTaskService;
         this.memoryService = memoryService;
+        this.roundExecutor = roundExecutor;
+        this.roundService = roundService;
+        this.multiRoundConfig = multiRoundConfig;
     }
 
     public SearchTaskRunResult run(SearchTaskRunRequest request) {
@@ -55,109 +54,52 @@ public class PolicySearchOrchestrator {
                 .map(String::trim)
                 .distinct()
                 .toList();
-        List<PolicySourceProperties.Item> sources = resolveSources(sourceIds);
+        List<PolicySourceProperties.Item> sources = roundExecutor.resolveSources(sourceIds);
         int maxLinks = Math.min(Math.max(request.maxLinksPerSource() == null
                 ? 10 : request.maxLinksPerSource(), 1), 50);
         boolean filterByKeyword = request.filterByKeyword() == null || request.filterByKeyword();
 
         SearchTask task = searchTaskService.createAndStart(request, keywords, sourceIds);
-        MutableCounters counters = new MutableCounters();
-        List<String> messages = new ArrayList<>();
-        List<String> executedSources = new ArrayList<>();
-        List<Long> candidatePolicyIds = new ArrayList<>();
-        List<SearchTaskMemoryContext.SourceFailure> sourceFailures = new ArrayList<>();
-        int successfulSources = 0;
-        int discoveryOrder = 0;
-
         safeMemory(task.getId(), "initialize", () -> memoryService.initialize(task));
         safeMemory(task.getId(), "markStarted", () -> memoryService.markStarted(task.getId()));
 
-        for (PolicySourceProperties.Item source : sources) {
-            String sourceError = null;
-            try {
-                PolicySiteAdapter adapter = findAdapter(source.getUrl());
-                List<PolicySiteAdapter.DiscoveredPolicyLink> links = adapter.discover(
-                        source.getUrl(),
-                        keywords,
-                        maxLinks,
-                        filterByKeyword
-                );
-                successfulSources++;
-                counters.found += links.size();
-                if (links.isEmpty()) {
-                    messages.add(source.getName() + "：未发现匹配链接");
-                }
-
-                for (PolicySiteAdapter.DiscoveredPolicyLink link : links) {
-                    discoveryOrder++;
-                    try {
-                        PolicyCandidateIngestService.IngestOutcome outcome = ingestService.ingest(
-                                task,
-                                source,
-                                link,
-                                discoveryOrder
-                        );
-                        if (outcome.associationCreated()) {
-                            counters.associated++;
-                        }
-                        if (outcome.policyId() != null) {
-                            candidatePolicyIds.add(outcome.policyId());
-                        }
-                        switch (outcome.type()) {
-                            case SAVED -> counters.saved++;
-                            case DUPLICATE -> counters.duplicate++;
-                            case FILTERED -> counters.filtered++;
-                        }
-                        if (outcome.type() != PolicyCandidateIngestService.ResultType.SAVED) {
-                            messages.add(source.getName() + " / " + link.url() + "：" + outcome.message());
-                        }
-                    } catch (Exception e) {
-                        counters.failed++;
-                        messages.add(source.getName() + " / " + link.url() + "：处理失败：" + rootMessage(e));
-                    }
-                }
-            } catch (Exception e) {
-                counters.failed++;
-                sourceError = rootMessage(e);
-                sourceFailures.add(new SearchTaskMemoryContext.SourceFailure(
-                        source.getId(), source.getName(), sourceError));
-                messages.add(source.getName() + "：信源采集失败：" + sourceError);
-            }
-
-            executedSources.add(source.getId());
-            SearchTaskMemoryContext snapshot = snapshot(
-                    task, counters, executedSources, candidatePolicyIds, sourceFailures);
-            final String failure = sourceError;
-            if (failure == null) {
-                safeMemory(task.getId(), "recordSourceSearched",
-                        () -> memoryService.recordSourceSearched(
-                                task.getId(), 1, source.getId(), source.getName(), snapshot));
-            } else {
-                safeMemory(task.getId(), "recordSourceFailed",
-                        () -> memoryService.recordSourceFailed(
-                                task.getId(), 1, source.getId(), source.getName(), snapshot, failure));
-            }
+        if (multiRoundConfig.enabled() && Boolean.TRUE.equals(request.multiRoundEnabled())) {
+            return roundService.runMultiRound(task, keywords, sourceIds, sources, maxLinks, filterByKeyword);
         }
 
-        SearchTaskMemoryContext finalSnapshot = snapshot(
-                task, counters, executedSources, candidatePolicyIds, sourceFailures);
+        RoundExecution execution = roundExecutor.execute(task, keywords, sources, maxLinks, filterByKeyword, 1, null);
+        SearchTaskMemoryContext finalSnapshot = memoryService.buildContext(
+                task,
+                execution.executedSources(),
+                execution.candidatePolicyIds(),
+                SearchTaskMemoryContext.Counts.of(
+                        execution.found(),
+                        execution.saved(),
+                        execution.duplicate(),
+                        execution.filtered(),
+                        execution.failed()
+                ),
+                execution.sourceFailures()
+        );
         safeMemory(task.getId(), "recordRoundCompleted",
                 () -> memoryService.recordRoundCompleted(task.getId(), finalSnapshot));
 
         SearchTask finished;
-        if (successfulSources == 0) {
-            String message = messages.isEmpty() ? "所有信源均采集失败" : String.join("；", messages);
-            finished = searchTaskService.fail(task.getId(), counters.found, counters.failed, message);
+        if (execution.successfulSources() == 0) {
+            String message = execution.messages().isEmpty()
+                    ? "所有信源均采集失败"
+                    : String.join("；", execution.messages());
+            finished = searchTaskService.fail(task.getId(), execution.found(), execution.failed(), message);
             safeMemory(task.getId(), "markFailed", () -> memoryService.markFailed(
                     task.getId(), finalSnapshot, message, "检查固定信源可用性后重新运行搜索任务"));
         } else {
             finished = searchTaskService.complete(
                     task.getId(),
-                    counters.found,
-                    counters.saved,
-                    counters.duplicate,
-                    counters.filtered,
-                    counters.failed
+                    execution.found(),
+                    execution.saved(),
+                    execution.duplicate(),
+                    execution.filtered(),
+                    execution.failed()
             );
             safeMemory(task.getId(), "markCompleted",
                     () -> memoryService.markCompleted(task.getId(), finalSnapshot));
@@ -166,36 +108,23 @@ public class PolicySearchOrchestrator {
         return new SearchTaskRunResult(
                 finished.getId(),
                 finished.getStatus(),
-                counters.found,
-                counters.saved,
-                counters.duplicate,
-                counters.filtered,
-                counters.failed,
-                counters.associated,
-                List.copyOf(messages)
+                execution.found(),
+                execution.saved(),
+                execution.duplicate(),
+                execution.filtered(),
+                execution.failed(),
+                execution.associated(),
+                1,
+                List.copyOf(execution.messages()),
+                false
         );
     }
 
-    private SearchTaskMemoryContext snapshot(
-            SearchTask task,
-            MutableCounters counters,
-            List<String> executedSources,
-            List<Long> candidatePolicyIds,
-            List<SearchTaskMemoryContext.SourceFailure> sourceFailures
-    ) {
-        return memoryService.buildContext(
-                task,
-                executedSources,
-                candidatePolicyIds,
-                SearchTaskMemoryContext.Counts.of(
-                        counters.found,
-                        counters.saved,
-                        counters.duplicate,
-                        counters.filtered,
-                        counters.failed
-                ),
-                sourceFailures
-        );
+    private List<String> normalizeKeywords(List<String> keywords) {
+        if (keywords == null || keywords.stream().noneMatch(this::hasText)) {
+            return SearchTopicDictionary.DEFAULT_TOPICS;
+        }
+        return keywords.stream().filter(this::hasText).map(String::trim).distinct().toList();
     }
 
     private void safeMemory(Long taskId, String operation, Runnable action) {
@@ -205,30 +134,6 @@ public class PolicySearchOrchestrator {
             log.warn("Agent Memory 记录失败（不影响搜索主流程）: taskId={}, operation={}, error={}",
                     taskId, operation, rootMessage(e));
         }
-    }
-
-    private List<PolicySourceProperties.Item> resolveSources(List<String> sourceIds) {
-        Map<String, PolicySourceProperties.Item> configured = new LinkedHashMap<>();
-        sourceProperties.getItems().forEach(source -> configured.put(source.getId(), source));
-        List<String> unknown = sourceIds.stream().filter(id -> !configured.containsKey(id)).toList();
-        if (!unknown.isEmpty()) {
-            throw new IllegalArgumentException("未知固定信源：" + unknown);
-        }
-        return sourceIds.stream().map(configured::get).toList();
-    }
-
-    private PolicySiteAdapter findAdapter(String sourceUrl) {
-        return siteAdapters.stream()
-                .filter(adapter -> adapter.supports(sourceUrl))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException("没有适配该政府网站的采集器：" + sourceUrl));
-    }
-
-    private List<String> normalizeKeywords(List<String> keywords) {
-        if (keywords == null || keywords.stream().noneMatch(this::hasText)) {
-            return DEFAULT_KEYWORDS;
-        }
-        return keywords.stream().filter(this::hasText).map(String::trim).distinct().toList();
     }
 
     private void validate(SearchTaskRunRequest request) {
@@ -263,14 +168,5 @@ public class PolicySearchOrchestrator {
 
     private boolean hasText(String value) {
         return value != null && !value.trim().isEmpty();
-    }
-
-    private static final class MutableCounters {
-        private int found;
-        private int saved;
-        private int duplicate;
-        private int filtered;
-        private int failed;
-        private int associated;
     }
 }

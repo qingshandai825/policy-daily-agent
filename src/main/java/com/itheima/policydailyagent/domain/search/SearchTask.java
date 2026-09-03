@@ -70,6 +70,31 @@ public class SearchTask {
     @Column(name = "failure_message", columnDefinition = "TEXT")
     private String failureMessage;
 
+    /**
+     * 持有执行权的执行器标识（单机 DB 租约）。执行中写入，正常结束/失败时清空。
+     */
+    @Column(name = "executor_id", length = 100)
+    private String executorId;
+
+    /**
+     * 执行租约过期时间。崩溃后到期即可被下一个 resume 接管；正常结束/失败时清空。
+     */
+    @Column(name = "lease_expires_at")
+    private LocalDateTime leaseExpiresAt;
+
+    /**
+     * 终止原因：正常停因（MAX_ROUNDS_REACHED/ALL_TOPICS_COVERED/NO_GROWTH/NO_NEW_PLAN）
+     * 或失败停因（TASK_ERROR/NO_AVAILABLE_SOURCE）。用于拒绝「已正常完成」任务的恢复。
+     */
+    @Column(name = "termination_reason", length = 50)
+    private String terminationReason;
+
+    /**
+     * 首次运行时的实际生效参数快照（JSON），resume 据此恢复原始参数而非当前默认配置。
+     */
+    @Column(name = "run_params_json", columnDefinition = "TEXT")
+    private String runParamsJson;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

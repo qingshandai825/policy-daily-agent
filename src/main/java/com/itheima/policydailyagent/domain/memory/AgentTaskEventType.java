@@ -6,8 +6,11 @@ package com.itheima.policydailyagent.domain.memory;
  */
 public enum AgentTaskEventType {
     TASK_STARTED,
+    ROUND_PLANNED,
+    ROUND_STARTED,
     SOURCE_SEARCHED,
     SOURCE_FAILED,
+    COVERAGE_EVALUATED,
     ROUND_COMPLETED,
     TASK_COMPLETED,
     TASK_FAILED

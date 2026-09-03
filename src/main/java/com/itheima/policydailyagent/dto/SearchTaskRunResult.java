@@ -13,6 +13,8 @@ public record SearchTaskRunResult(
         int filteredCount,
         int failedCount,
         int associatedCount,
-        List<String> messages
+        int roundCount,
+        List<String> messages,
+        boolean countsIncomplete
 ) {
 }

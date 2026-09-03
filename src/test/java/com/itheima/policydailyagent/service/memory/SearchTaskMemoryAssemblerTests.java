@@ -50,6 +50,22 @@ class SearchTaskMemoryAssemblerTests {
     }
 
     @Test
+    void oldContextJsonWithoutMultiRoundFieldsParsesWithDefaults() {
+        String oldJson = "{\"reportMonth\":\"2026-08\",\"targetStartDate\":\"2026-08-01\","
+                + "\"targetEndDate\":\"2026-08-31\",\"keywords\":[\"人工智能\"],"
+                + "\"selectedSources\":[\"gov\"],\"executedSources\":[\"gov\"],"
+                + "\"counts\":{\"found\":1,\"saved\":0,\"duplicate\":0,\"filtered\":0,\"failed\":0},"
+                + "\"candidatePolicyIds\":[10],\"sourceFailures\":[]}";
+
+        SearchTaskMemoryContext parsed = assembler.parseContext(oldJson);
+
+        assertThat(parsed).isNotNull();
+        assertThat(parsed.currentRound()).isZero();
+        assertThat(parsed.consecutiveNoGrowthRounds()).isZero();
+        assertThat(parsed.stopReason()).isNull();
+    }
+
+    @Test
     void contextOfUsesEmptyListsWhenTaskHasNoMetadata() {
         SearchTask task = new SearchTask();
         task.setTargetStartDate(LocalDate.of(2026, 8, 1));

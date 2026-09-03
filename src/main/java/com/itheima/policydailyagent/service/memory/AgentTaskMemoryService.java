@@ -122,12 +122,60 @@ public class AgentTaskMemoryService {
 
     @Transactional
     public AgentTaskMemory recordRoundCompleted(Long taskId, SearchTaskMemoryContext context) {
+        return recordRoundCompleted(taskId, 1, context);
+    }
+
+    @Transactional
+    public AgentTaskMemory recordRoundCompleted(Long taskId, int roundNo, SearchTaskMemoryContext context) {
         AgentTaskMemory memory = require(taskId);
         String contextJson = assembler.toJson(context);
         updateSnapshot(memory, AgentTaskPhase.SEARCHING,
-                "本轮搜索完成：" + summarize(context), contextJson, "进入人工审核候选政策");
-        appendEvent(memory, 1, AgentTaskEventType.ROUND_COMPLETED,
-                null, assembler.toJson(context.counts()), "一轮搜索完成");
+                "第 " + roundNo + " 轮搜索完成：" + summarize(context), contextJson, "进入下一轮或人工审核");
+        appendEvent(memory, roundNo, AgentTaskEventType.ROUND_COMPLETED,
+                null, assembler.toJson(context.counts()), "第 " + roundNo + " 轮搜索完成");
+        return memory;
+    }
+
+    @Transactional
+    public AgentTaskMemory recordRoundPlanned(
+            Long taskId,
+            int roundNo,
+            List<String> keywords,
+            List<String> sourceIds
+    ) {
+        AgentTaskMemory memory = require(taskId);
+        updateSnapshot(memory, AgentTaskPhase.SEARCHING,
+                "第 " + roundNo + " 轮计划已生成（关键词 " + (keywords == null ? 0 : keywords.size()) + " 个）",
+                memory.getContextJson(), "开始执行第 " + roundNo + " 轮搜索");
+        appendEvent(memory, roundNo, AgentTaskEventType.ROUND_PLANNED,
+                null,
+                assembler.toJson(Map.of("keywords", keywords == null ? List.of() : keywords,
+                        "sources", sourceIds == null ? List.of() : sourceIds)),
+                "第 " + roundNo + " 轮计划：" + String.join("、", keywords == null ? List.of() : keywords));
+        return memory;
+    }
+
+    @Transactional
+    public AgentTaskMemory recordRoundStarted(Long taskId, int roundNo) {
+        AgentTaskMemory memory = require(taskId);
+        appendEvent(memory, roundNo, AgentTaskEventType.ROUND_STARTED,
+                null, null, "开始执行第 " + roundNo + " 轮搜索");
+        return memory;
+    }
+
+    @Transactional
+    public AgentTaskMemory recordCoverageEvaluated(
+            Long taskId,
+            int roundNo,
+            List<SearchTaskMemoryContext.TopicCoverage> coverage
+    ) {
+        AgentTaskMemory memory = require(taskId);
+        updateSnapshot(memory, AgentTaskPhase.SEARCHING,
+                "第 " + roundNo + " 轮主题覆盖度评估完成", memory.getContextJson(), "根据覆盖度决定是否继续下一轮");
+        appendEvent(memory, roundNo, AgentTaskEventType.COVERAGE_EVALUATED,
+                null,
+                assembler.toJson(Map.of("topicCoverage", coverage == null ? List.of() : coverage)),
+                summarizeCoverage(coverage));
         return memory;
     }
 
@@ -307,6 +355,14 @@ public class AgentTaskMemoryService {
         SearchTaskMemoryContext.Counts c = context.counts();
         return "发现 " + c.found() + "、保存 " + c.saved() + "、重复 " + c.duplicate()
                 + "、过滤 " + c.filtered() + "、失败 " + c.failed();
+    }
+
+    private String summarizeCoverage(List<SearchTaskMemoryContext.TopicCoverage> coverage) {
+        if (coverage == null || coverage.isEmpty()) {
+            return "无主题覆盖度结果";
+        }
+        long covered = coverage.stream().filter(c -> "COVERED".equals(c.status())).count();
+        return "主题覆盖度：已覆盖 " + covered + "/" + coverage.size();
     }
 
     private String safe(String value) {

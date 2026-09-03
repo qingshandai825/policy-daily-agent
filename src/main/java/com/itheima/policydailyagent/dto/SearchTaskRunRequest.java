@@ -11,6 +11,7 @@ public record SearchTaskRunRequest(
         List<String> keywords,
         List<String> sourceIds,
         Integer maxLinksPerSource,
-        Boolean filterByKeyword
+        Boolean filterByKeyword,
+        Boolean multiRoundEnabled
 ) {
 }

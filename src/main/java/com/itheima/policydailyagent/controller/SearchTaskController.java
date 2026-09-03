@@ -1,11 +1,13 @@
 package com.itheima.policydailyagent.controller;
 
 import com.itheima.policydailyagent.domain.search.SearchTask;
+import com.itheima.policydailyagent.dto.SearchTaskRoundView;
 import com.itheima.policydailyagent.dto.SearchTaskRunRequest;
 import com.itheima.policydailyagent.dto.SearchTaskRunResult;
 import com.itheima.policydailyagent.service.SearchTaskService;
 import com.itheima.policydailyagent.service.memory.AgentTaskMemoryService;
 import com.itheima.policydailyagent.service.search.PolicySearchOrchestrator;
+import com.itheima.policydailyagent.service.search.SearchRoundService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -19,15 +21,18 @@ public class SearchTaskController {
     private final SearchTaskService searchTaskService;
     private final PolicySearchOrchestrator searchOrchestrator;
     private final AgentTaskMemoryService memoryService;
+    private final SearchRoundService roundService;
 
     public SearchTaskController(
             SearchTaskService searchTaskService,
             PolicySearchOrchestrator searchOrchestrator,
-            AgentTaskMemoryService memoryService
+            AgentTaskMemoryService memoryService,
+            SearchRoundService roundService
     ) {
         this.searchTaskService = searchTaskService;
         this.searchOrchestrator = searchOrchestrator;
         this.memoryService = memoryService;
+        this.roundService = roundService;
     }
 
     @PostMapping("/run")
@@ -72,6 +77,28 @@ public class SearchTaskController {
     @GetMapping("/recent")
     public ResponseEntity<List<SearchTask>> listRecentTasks() {
         return ResponseEntity.ok(searchTaskService.listRecentTasks());
+    }
+
+    @GetMapping("/{taskId}/rounds")
+    public ResponseEntity<?> getRounds(@PathVariable Long taskId) {
+        try {
+            List<SearchTaskRoundView> rounds = roundService.rounds(taskId);
+            return ResponseEntity.ok(rounds);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/{taskId}/resume")
+    public ResponseEntity<?> resume(@PathVariable Long taskId) {
+        try {
+            SearchTaskRunResult result = roundService.resume(taskId);
+            return ResponseEntity.ok(result);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("message", e.getMessage()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.internalServerError().body(Map.of("message", e.getMessage()));
+        }
     }
 
     @DeleteMapping("/{taskId}")
