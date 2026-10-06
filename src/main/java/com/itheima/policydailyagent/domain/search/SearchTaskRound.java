@@ -59,6 +59,9 @@ public class SearchTaskRound {
     @Column(name = "coverage_after_json", columnDefinition = "TEXT")
     private String coverageAfterJson;
 
+    @Column(name = "search_feedback_json", columnDefinition = "TEXT")
+    private String searchFeedbackJson;
+
     @Column(name = "found_count", nullable = false)
     private int foundCount;
 

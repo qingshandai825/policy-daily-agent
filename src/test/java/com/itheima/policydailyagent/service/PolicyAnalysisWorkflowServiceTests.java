@@ -150,6 +150,33 @@ class PolicyAnalysisWorkflowServiceTests {
         return policy;
     }
 
+    @Test
+    void shouldPersistFailedQualityReportAndKeepConfirmationClosed() {
+        PolicyDocument policy = policy(PolicyReviewStatus.ACCEPTED);
+        when(policyRepository.findById(7L)).thenReturn(Optional.of(policy));
+        when(analysisAgent.isAvailable()).thenReturn(true);
+        when(sectionRepository.findByActiveTrueOrderBySortOrderAsc()).thenReturn(List.of(section()));
+        when(analysisRepository.findTopByPolicyIdOrderByVersionNoDesc(7L)).thenReturn(Optional.empty());
+        when(analysisRepository.save(any(PolicyAnalysis.class))).thenAnswer(inv -> {
+            PolicyAnalysis value = inv.getArgument(0); value.setId(91L); return value;
+        });
+        var report = new com.itheima.policydailyagent.dto.DraftQualityReport(false, 2,
+                List.of(new com.itheima.policydailyagent.dto.DraftQualityReport.Attempt(3, List.of("原文证据不匹配"))));
+        when(analysisAgent.analyze(eq(policy), anyList(), any())).thenThrow(new DraftValidationException(report));
+        assertThatThrownBy(() -> service.analyze(7L, new PolicyAnalysisRequest("analyst")))
+                .isInstanceOf(PolicyAnalysisExecutionException.class);
+        org.mockito.ArgumentCaptor<PolicyAnalysis> saved = org.mockito.ArgumentCaptor.forClass(PolicyAnalysis.class);
+        verify(analysisRepository, atLeastOnce()).save(saved.capture());
+        PolicyAnalysis failed = saved.getValue();
+        assertThat(failed.getRunStatus()).isEqualTo(AnalysisRunStatus.FAILED);
+        assertThat(failed.getQualityReportJson()).contains("原文证据不匹配", "\"passed\":false");
+        assertThatThrownBy(() -> {
+            when(analysisRepository.findById(91L)).thenReturn(Optional.of(failed));
+            service.requireSucceededAnalysis(7L, 91L);
+        }).hasMessageContaining("SUCCEEDED");
+        verifyNoInteractions(itemRepository);
+    }
+
     private ReportSection section() {
         ReportSection section = new ReportSection();
         section.setId(11L);

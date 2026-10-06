@@ -24,6 +24,7 @@ public record PolicyAnalysisView(
         String createdBy,
         LocalDateTime createdAt,
         LocalDateTime completedAt,
-        List<ReportPlacementView> placements
+        List<ReportPlacementView> placements,
+        DraftQualityReport qualityReport
 ) {
 }

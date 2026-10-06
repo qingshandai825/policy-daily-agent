@@ -15,8 +15,22 @@ public record MultiRoundConfig(
         int coverageThreshold,
         int maxKeywordsPerRound,
         int maxContentScanLength,
-        List<String> topics
+        List<String> topics,
+        boolean semanticFeedbackEnabled,
+        boolean materialSufficiencyEnabled
 ) {
+
+    public MultiRoundConfig(boolean enabled, int maxRounds, int noGrowthRounds, int coverageThreshold,
+                            int maxKeywordsPerRound, int maxContentScanLength, List<String> topics) {
+        this(enabled, maxRounds, noGrowthRounds, coverageThreshold, maxKeywordsPerRound, maxContentScanLength, topics, false);
+    }
+
+    public MultiRoundConfig(boolean enabled, int maxRounds, int noGrowthRounds, int coverageThreshold,
+                            int maxKeywordsPerRound, int maxContentScanLength, List<String> topics,
+                            boolean semanticFeedbackEnabled) {
+        this(enabled, maxRounds, noGrowthRounds, coverageThreshold, maxKeywordsPerRound, maxContentScanLength,
+                topics, semanticFeedbackEnabled, semanticFeedbackEnabled);
+    }
 
     /** 最大轮次硬上限，防止配置过大导致无限循环。 */
     public static final int HARD_MAX_ROUNDS = 20;
@@ -39,7 +53,8 @@ public record MultiRoundConfig(
                 requireRange(properties.getCoverageThreshold(), 1, 10_000, "coverage-threshold"),
                 requireRange(properties.getMaxKeywordsPerRound(), 1, 100, "max-keywords-per-round"),
                 requireRange(properties.getMaxContentScanLength(), 0, 100_000, "max-content-scan-length"),
-                List.copyOf(topics)
+                List.copyOf(topics),
+                properties.isSemanticFeedbackEnabled()
         );
     }
 

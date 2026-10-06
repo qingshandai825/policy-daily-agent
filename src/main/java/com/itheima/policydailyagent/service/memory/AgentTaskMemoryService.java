@@ -180,6 +180,15 @@ public class AgentTaskMemoryService {
     }
 
     @Transactional
+    public AgentTaskMemory recordSearchFeedback(Long taskId, int roundNo,
+            com.itheima.policydailyagent.service.search.SearchFeedback feedback) {
+        AgentTaskMemory memory = require(taskId);
+        appendEvent(memory, roundNo, AgentTaskEventType.SEARCH_FEEDBACK_EVALUATED,
+                null, assembler.toJson(feedback), "第 " + roundNo + " 轮材料反馈：" + feedback.note());
+        return memory;
+    }
+
+    @Transactional
     public AgentTaskMemory markCompleted(Long taskId, SearchTaskMemoryContext context) {
         AgentTaskMemory memory = require(taskId);
         memory.setMemoryStatus(AgentTaskMemoryStatus.COMPLETED);

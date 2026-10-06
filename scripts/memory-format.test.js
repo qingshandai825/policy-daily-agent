@@ -48,3 +48,20 @@ assert.strictEqual(M.summarizeEventOutput('ROUND_COMPLETED', '{"found":2,"saved"
 assert.strictEqual(M.summarizeEventOutput('TASK_STARTED', null), null);
 
 console.log('memory-format 纯函数断言全部通过');
+
+assert.strictEqual(M.eventTypeText('SEARCH_FEEDBACK_EVALUATED'), '材料缺口与术语反馈');
+assert.strictEqual(M.summarizeEventOutput('SEARCH_FEEDBACK_EVALUATED', JSON.stringify({
+    coverage: [{topic: '人工智能', status: 'COVERED'}, {topic: '算力', status: 'NOT_COVERED'}],
+    terms: [{term: '智算中心'}], note: '引用已核对'
+})), '待补主题：算力 · 原文术语：智算中心 · 引用已核对');
+
+assert.strictEqual(M.summarizeAssessment({materialAssessment: {
+    materialSufficient: true, missingTopics: [], evidencePolicyIds: [1], reason: '实质内容已覆盖', validationIssues: []
+}}), '模型判断：材料充分；实质内容已覆盖');
+assert.strictEqual(M.summarizeAssessment({materialAssessment: {
+    materialSufficient: true, validationIssues: ['缺少原文证据']
+}}), '充分性评估未采纳：缺少原文证据');
+assert.ok(M.summarizeEventOutput('SEARCH_FEEDBACK_EVALUATED', JSON.stringify({
+    coverage: [{topic: '人工智能', status: 'COVERED'}], terms: [],
+    materialAssessment: {materialSufficient: false, missingTopics: ['人工智能'], reason: '缺少应用案例', validationIssues: []}
+})).includes('待补主题：人工智能'));

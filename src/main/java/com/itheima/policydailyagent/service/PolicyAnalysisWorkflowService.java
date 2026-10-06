@@ -28,7 +28,7 @@ import java.util.List;
 @Service
 public class PolicyAnalysisWorkflowService {
 
-    public static final String PROMPT_VERSION = "policy-analysis-v1";
+    public static final String PROMPT_VERSION = "policy-analysis-v2-checked";
 
     private final PolicyDocumentRepository policyRepository;
     private final PolicyAnalysisRepository analysisRepository;
@@ -147,6 +147,7 @@ public class PolicyAnalysisWorkflowService {
             analysis.setGeneratedTitle(draft.generatedTitle());
             analysis.setGeneratedContent(draft.generatedContent());
             analysis.setEvidenceJson(objectMapper.writeValueAsString(draft.evidence()));
+            analysis.setQualityReportJson(objectMapper.writeValueAsString(draft.qualityReport()));
             analysis.setRunStatus(AnalysisRunStatus.SUCCEEDED);
             analysis.setCompletedAt(LocalDateTime.now());
             analysis = analysisRepository.save(analysis);
@@ -155,6 +156,13 @@ public class PolicyAnalysisWorkflowService {
             policyRepository.save(policy);
             return toView(analysis);
         } catch (Exception e) {
+            if (e instanceof DraftValidationException validation) {
+                try {
+                    analysis.setQualityReportJson(objectMapper.writeValueAsString(validation.report()));
+                } catch (JsonProcessingException ignored) {
+                    // 质量报告是只读诊断信息，不替代失败状态与审核门。
+                }
+            }
             analysis.setRunStatus(AnalysisRunStatus.FAILED);
             analysis.setErrorMessage(limitError(e.getMessage()));
             analysis.setCompletedAt(LocalDateTime.now());
@@ -238,7 +246,8 @@ public class PolicyAnalysisWorkflowService {
                 analysis.getCreatedBy(),
                 analysis.getCreatedAt(),
                 analysis.getCompletedAt(),
-                placements
+                placements,
+                readQualityReport(analysis.getQualityReportJson())
         );
     }
 
@@ -249,6 +258,15 @@ public class PolicyAnalysisWorkflowService {
                 item.getSectionId(),
                 item.getStatus()
         );
+    }
+
+    private com.itheima.policydailyagent.dto.DraftQualityReport readQualityReport(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return objectMapper.readValue(value, com.itheima.policydailyagent.dto.DraftQualityReport.class);
+        } catch (JsonProcessingException e) {
+            return null;
+        }
     }
 
     private PolicyBasicInfoView readBasicInfo(String value) {

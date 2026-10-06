@@ -16,11 +16,13 @@ public record SearchRunParams(
         int coverageThreshold,
         int maxKeywordsPerRound,
         int maxContentScanLength,
-        List<String> topics
+        List<String> topics,
+        boolean semanticFeedbackEnabled,
+        boolean materialSufficiencyEnabled
 ) {
 
     /** 参数快照结构版本，结构变化时递增。 */
-    public static final int CURRENT_VERSION = 1;
+    public static final int CURRENT_VERSION = 3;
 
     public static SearchRunParams of(
             int maxLinksPerSource,
@@ -38,7 +40,9 @@ public record SearchRunParams(
                 config.coverageThreshold(),
                 config.maxKeywordsPerRound(),
                 config.maxContentScanLength(),
-                config.topics()
+                config.topics(),
+                config.semanticFeedbackEnabled(),
+                config.materialSufficiencyEnabled()
         );
     }
 
@@ -51,7 +55,9 @@ public record SearchRunParams(
                 coverageThreshold,
                 maxKeywordsPerRound,
                 maxContentScanLength,
-                topics == null ? List.of() : List.copyOf(topics)
+                topics == null ? List.of() : List.copyOf(topics),
+                version >= 2 && semanticFeedbackEnabled,
+                version >= 3 && semanticFeedbackEnabled && materialSufficiencyEnabled
         );
     }
 }

@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -74,7 +75,9 @@ public class SearchRoundService {
     private final SearchStopPolicy stopPolicy;
     private final MultiRoundConfig config;
     private final Clock clock;
+    private final SearchFeedbackService feedbackService;
 
+    @Autowired
     public SearchRoundService(
             SearchTaskService searchTaskService,
             AgentTaskMemoryService memoryService,
@@ -88,7 +91,8 @@ public class SearchRoundService {
             TopicCoverageEvaluator coverageEvaluator,
             SearchStopPolicy stopPolicy,
             MultiRoundConfig config,
-            Clock clock
+            Clock clock,
+            SearchFeedbackService feedbackService
     ) {
         this.searchTaskService = searchTaskService;
         this.memoryService = memoryService;
@@ -103,6 +107,16 @@ public class SearchRoundService {
         this.stopPolicy = stopPolicy;
         this.config = config;
         this.clock = clock;
+        this.feedbackService = feedbackService;
+    }
+
+    public SearchRoundService(SearchTaskService taskService, AgentTaskMemoryService memoryService,
+            SearchTaskMemoryAssembler assembler, SearchRoundExecutor executor, SearchTaskRoundRepository rounds,
+            SearchTaskPolicyRepository associations, PolicyDocumentRepository documents,
+            SearchTaskSourceFailureRepository failures, SearchRoundPlanner planner,
+            TopicCoverageEvaluator evaluator, SearchStopPolicy stopPolicy, MultiRoundConfig config, Clock clock) {
+        this(taskService, memoryService, assembler, executor, rounds, associations, documents, failures,
+                planner, evaluator, stopPolicy, config, clock, null);
     }
 
     /**
@@ -218,6 +232,7 @@ public class SearchRoundService {
         List<Integer> completedRounds = new ArrayList<>(initial.completedRounds());
         int consecutiveNoGrowth = initial.consecutiveNoGrowth();
         List<TopicCoverageResult> lastCoverage = initial.lastCoverage();
+        SearchFeedback lastFeedback = initial.lastFeedback();
         Set<String> executedSignatures = new HashSet<>();
         for (SearchTaskMemoryContext.ExecutedPlan plan : executedPlans) {
             executedSignatures.add(signatureOf(plan.keywords(), plan.sources()));
@@ -248,7 +263,8 @@ public class SearchRoundService {
             }
             Optional<String> preStop = stopPolicy.checkBeforeExecution(
                     roundNo, effectiveConfig.maxRounds(), lastCoverage,
-                    effectiveConfig.noGrowthRounds(), consecutiveNoGrowth);
+                    effectiveConfig.noGrowthRounds(), consecutiveNoGrowth,
+                    lastFeedback, effectiveConfig.materialSufficiencyEnabled());
             if (preStop.isPresent()) {
                 stopReason = preStop.get();
                 break;
@@ -262,9 +278,13 @@ public class SearchRoundService {
                         .toList();
                 plan = new RoundPlan(pendingInitialPlan.keywords(), filteredSources);
             } else {
-                Optional<RoundPlan> next = planner.planNextRound(
-                        lastCoverage, new ArrayList<>(executedKeywords),
-                        effectiveConfig.topics(), availableSourceIds, effectiveConfig.maxKeywordsPerRound());
+                Optional<RoundPlan> next = effectiveConfig.semanticFeedbackEnabled()
+                        ? planner.planFromFeedback(lastFeedback == null
+                                ? new SearchFeedback("RULE_FALLBACK", null, lastCoverage, List.of(), "恢复时无语义反馈")
+                                : lastFeedback, executedPlans, effectiveConfig.topics(), availableSourceIds,
+                                effectiveConfig.maxKeywordsPerRound(), effectiveConfig.materialSufficiencyEnabled())
+                        : planner.planNextRound(lastCoverage, new ArrayList<>(executedKeywords),
+                                effectiveConfig.topics(), availableSourceIds, effectiveConfig.maxKeywordsPerRound());
                 if (next.isEmpty()) {
                     stopReason = "NO_NEW_PLAN";
                     break;
@@ -330,7 +350,9 @@ public class SearchRoundService {
             RoundExecution execution;
             try {
                 execution = roundExecutor.execute(
-                        task, plan.keywords(), availableSources, maxLinks, filterByKeyword, roundNo, executorId);
+                        task, plan.keywords(), availableSources.stream()
+                                .filter(source -> plan.sourceIds().contains(source.getId())).toList(),
+                        maxLinks, filterByKeyword, roundNo, executorId);
             } catch (LeaseLostException e) {
                 throw e;
             } catch (SourceFailureCheckpointException e) {
@@ -380,7 +402,20 @@ public class SearchRoundService {
 
             List<TopicCoverageResult> coverage;
             try {
-                coverage = evaluateCoverage(task.getId(), effectiveConfig);
+                if (effectiveConfig.semanticFeedbackEnabled() && feedbackService != null) {
+                    renewLease(task.getId(), executorId);
+                    lastFeedback = feedbackService.evaluate(loadCandidates(task.getId()), effectiveConfig,
+                            List.copyOf(executedPlans), Map.of(
+                                    "reportMonth", task.getReportMonth() == null ? "" : task.getReportMonth(),
+                                    "targetStartDate", String.valueOf(task.getTargetStartDate()),
+                                    "targetEndDate", String.valueOf(task.getTargetEndDate())));
+                    renewLease(task.getId(), executorId);
+                    coverage = lastFeedback.coverage();
+                } else {
+                    coverage = evaluateCoverage(task.getId(), effectiveConfig);
+                }
+            } catch (LeaseLostException e) {
+                throw e;
             } catch (Exception e) {
                 log.error("第 {} 轮覆盖度评估失败: taskId={}, error={}",
                         roundNo, task.getId(), e.getMessage(), e);
@@ -408,6 +443,7 @@ public class SearchRoundService {
                 round.setFailedCount(execution.failed());
                 round.setNewAssociationCount(execution.associated());
                 round.setCoverageAfterJson(assembler.toJson(coverage));
+                round.setSearchFeedbackJson(lastFeedback == null ? null : assembler.toJson(lastFeedback));
                 round.setCompletedAt(LocalDateTime.now(clock));
                 round = searchTaskService.withOwnership(task.getId(), executorId,
                         () -> roundRepository.save(completedToSave));
@@ -425,13 +461,19 @@ public class SearchRoundService {
             }
             lastExecutedRound = round;
 
+            final SearchFeedback recordedFeedback = lastFeedback;
+            if (recordedFeedback != null) {
+                safeMemory(task.getId(), "recordSearchFeedback",
+                        () -> memoryService.recordSearchFeedback(task.getId(), roundNo, recordedFeedback));
+            }
+
             List<SearchTaskMemoryContext.TopicCoverage> memoryCoverage = toMemoryCoverage(coverage);
             safeMemory(task.getId(), "recordCoverageEvaluated",
                     () -> memoryService.recordCoverageEvaluated(task.getId(), roundNo, memoryCoverage));
 
             SearchTaskMemoryContext snapshot = assembler.contextOf(
                     task,
-                    availableSourceIds,
+                    execution.executedSources(),
                     List.copyOf(allCandidatePolicyIds),
                     SearchTaskMemoryContext.Counts.of(totalFound, totalSaved, totalDuplicate, totalFiltered, totalFailed),
                     List.copyOf(allSourceFailures.values()),
@@ -441,7 +483,7 @@ public class SearchRoundService {
                     memoryCoverage,
                     consecutiveNoGrowth,
                     null
-            );
+            ).withFeedback(lastFeedback);
             safeMemory(task.getId(), "recordRoundCompleted",
                     () -> memoryService.recordRoundCompleted(task.getId(), roundNo, snapshot));
 
@@ -510,7 +552,7 @@ public class SearchRoundService {
                 toMemoryCoverage(lastCoverage),
                 consecutiveNoGrowth,
                 terminationReason
-        );
+        ).withFeedback(loadLatestFeedback(task.getId()));
 
         boolean unrecoverable = "TASK_ERROR".equals(stopReason)
                 || "NO_AVAILABLE_SOURCE".equals(stopReason)
@@ -602,7 +644,7 @@ public class SearchRoundService {
         if (params == null) {
             throw new IllegalStateException("该任务缺少执行参数快照，无法可靠恢复，请重新运行搜索任务");
         }
-        if (params.version() != SearchRunParams.CURRENT_VERSION) {
+        if (params.version() < 1 || params.version() > SearchRunParams.CURRENT_VERSION) {
             throw new IllegalStateException("该任务的执行参数快照版本不兼容，无法恢复，请重新运行搜索任务");
         }
         if (!params.multiRoundEnabled()) {
@@ -646,6 +688,7 @@ public class SearchRoundService {
         RoundPlan pendingPlan = null;
         String terminalReason = null;
         boolean statsIncomplete = false;
+        SearchFeedback lastFeedback = null;
 
         for (SearchTaskRound round : latestAttemptByRoundNo.values()) {
             List<String> keywords = assembler.parseStringList(round.getKeywordsJson());
@@ -658,6 +701,7 @@ public class SearchRoundService {
                 executedPlans.add(new SearchTaskMemoryContext.ExecutedPlan(keywords, roundSources));
                 completedRounds.add(round.getRoundNo());
                 lastCompletedRoundNo = Math.max(lastCompletedRoundNo, round.getRoundNo());
+                lastFeedback = assembler.parseJson(round.getSearchFeedbackJson(), SearchFeedback.class);
                 totalFound += round.getFoundCount();
                 totalSaved += round.getSavedCount();
                 totalDuplicate += round.getDuplicateCount();
@@ -707,7 +751,12 @@ public class SearchRoundService {
                             failure.getSourceId(), failure.getSourceName(), failure.getMessage()));
         }
 
-        List<TopicCoverageResult> lastCoverage = evaluateCoverage(taskId, effectiveConfig);
+        List<TopicCoverageResult> lastCoverage = effectiveConfig.semanticFeedbackEnabled()
+                ? lastFeedback == null
+                        ? effectiveConfig.topics().stream().map(t -> new TopicCoverageResult(t, 0,
+                                CoverageStatus.NOT_COVERED, List.of())).toList()
+                        : lastFeedback.coverage()
+                : evaluateCoverage(taskId, effectiveConfig);
 
         int nextRoundNo = pendingRoundNo >= 0 ? pendingRoundNo : lastCompletedRoundNo + 1;
         return new RecoveryState(
@@ -715,7 +764,7 @@ public class SearchRoundService {
                 executedKeywords, executedPlans, completedRounds,
                 consecutiveNoGrowth, lastCoverage,
                 totalFound, totalSaved, totalDuplicate, totalFiltered, totalFailed,
-                candidateIds, sourceFailures, statsIncomplete
+                candidateIds, sourceFailures, statsIncomplete, lastFeedback
         );
     }
 
@@ -774,12 +823,22 @@ public class SearchRoundService {
                 round.getStopReason(),
                 round.getStartedAt(),
                 round.getCompletedAt(),
-                round.getCreatedAt()
+                round.getCreatedAt(),
+                round.getSearchFeedbackJson()
         );
     }
 
     private String signatureOf(List<String> keywords, List<String> sourceIds) {
         return new RoundPlan(keywords, sourceIds).signature();
+    }
+
+    private SearchFeedback loadLatestFeedback(Long taskId) {
+        return roundRepository.findBySearchTaskIdOrderByRoundNoAsc(taskId).stream()
+                .filter(r -> r.getStatus() == SearchTaskRoundStatus.COMPLETED
+                        || r.getStatus() == SearchTaskRoundStatus.PARTIAL_FAILED)
+                .max(java.util.Comparator.comparingInt(SearchTaskRound::getRoundNo)
+                        .thenComparingInt(SearchTaskRound::getRetryNo))
+                .map(r -> assembler.parseJson(r.getSearchFeedbackJson(), SearchFeedback.class)).orElse(null);
     }
 
     private String buildFailureMessage(String stopReason, List<String> messages) {
@@ -872,14 +931,15 @@ public class SearchRoundService {
             int totalFailed,
             LinkedHashSet<Long> candidateIds,
             Map<String, SearchTaskMemoryContext.SourceFailure> sourceFailures,
-            boolean statsIncomplete
+            boolean statsIncomplete,
+            SearchFeedback lastFeedback
     ) {
         static RecoveryState empty() {
             return new RecoveryState(
                     1, 0, null, null,
                     new LinkedHashSet<>(), new ArrayList<>(), new ArrayList<>(),
                     0, List.of(), 0, 0, 0, 0, 0,
-                    new LinkedHashSet<>(), new HashMap<>(), false
+                    new LinkedHashSet<>(), new HashMap<>(), false, null
             );
         }
     }

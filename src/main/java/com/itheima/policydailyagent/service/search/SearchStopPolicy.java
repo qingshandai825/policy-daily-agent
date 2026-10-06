@@ -68,4 +68,20 @@ public class SearchStopPolicy {
                 && !coverage.isEmpty()
                 && coverage.stream().allMatch(result -> result.status() == CoverageStatus.COVERED);
     }
+
+    /**
+     * 新语义模式以经过引用校验的模型充分性评估决定业务完成；关键词覆盖只是统计。
+     * 无效、缺失或降级评估不会被当作完成，仍受程序轮数与无增长上限约束。
+     */
+    public Optional<String> checkBeforeExecution(int nextRoundNo, int maxRounds,
+            List<TopicCoverageResult> coverage, int noGrowthRounds, int consecutiveNoGrowthRounds,
+            SearchFeedback feedback, boolean materialSufficiencyEnabled) {
+        if (!materialSufficiencyEnabled) {
+            return checkBeforeExecution(nextRoundNo, maxRounds, coverage, noGrowthRounds, consecutiveNoGrowthRounds);
+        }
+        if (feedback != null && feedback.canFinishByAssessment()) return Optional.of("LLM_MATERIAL_SUFFICIENT");
+        if (nextRoundNo > maxRounds) return Optional.of("MAX_ROUNDS_REACHED");
+        if (consecutiveNoGrowthRounds >= noGrowthRounds) return Optional.of("NO_GROWTH");
+        return Optional.empty();
+    }
 }

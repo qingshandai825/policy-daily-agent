@@ -123,7 +123,8 @@ policy:
     multi-round:
       # \u591a\u8f6e\u653f\u7b56\u641c\u7d22\u7b2c\u4e00\u9636\u6bb5\uff1a\u9ed8\u8ba4\u5173\u95ed\uff08\u4fdd\u6301\u5355\u8f6e\u884c\u4e3a\uff09\uff0c\u9700\u663e\u5f0f\u542f\u7528\u4e14\u8bf7\u6c42\u643a\u5e26
       # multiRoundEnabled=true \u624d\u4f1a\u751f\u6548\u3002
-      enabled: false
+      enabled: ${POLICY_SEARCH_MULTI_ROUND_ENABLED:false}
+      semantic-feedback-enabled: ${POLICY_SEARCH_SEMANTIC_FEEDBACK_ENABLED:false}
       max-rounds: 3
       no-growth-rounds: 2
       coverage-threshold: 1

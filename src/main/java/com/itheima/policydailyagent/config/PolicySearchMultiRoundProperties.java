@@ -13,6 +13,7 @@ import java.util.List;
 public class PolicySearchMultiRoundProperties {
 
     private boolean enabled = false;
+    private boolean semanticFeedbackEnabled = false;
     private int maxRounds = 3;
     private int noGrowthRounds = 2;
     private int coverageThreshold = 1;
@@ -23,6 +24,10 @@ public class PolicySearchMultiRoundProperties {
     public boolean isEnabled() {
         return enabled;
     }
+
+    public boolean isSemanticFeedbackEnabled() { return semanticFeedbackEnabled; }
+
+    public void setSemanticFeedbackEnabled(boolean enabled) { this.semanticFeedbackEnabled = enabled; }
 
     public void setEnabled(boolean enabled) {
         this.enabled = enabled;

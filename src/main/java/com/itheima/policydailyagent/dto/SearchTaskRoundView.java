@@ -26,6 +26,7 @@ public record SearchTaskRoundView(
         String stopReason,
         LocalDateTime startedAt,
         LocalDateTime completedAt,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String searchFeedbackJson
 ) {
 }

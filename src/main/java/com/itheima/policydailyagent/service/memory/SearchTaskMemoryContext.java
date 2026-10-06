@@ -2,6 +2,7 @@ package com.itheima.policydailyagent.service.memory;
 
 import java.time.LocalDate;
 import java.util.List;
+import com.itheima.policydailyagent.service.search.SearchFeedback;
 
 /**
  * 搜索任务 Memory 的结构化上下文快照，是 context_json 的稳定序列化结构。
@@ -28,8 +29,25 @@ public record SearchTaskMemoryContext(
         List<ExecutedPlan> executedPlans,
         List<TopicCoverage> topicCoverage,
         int consecutiveNoGrowthRounds,
-        String stopReason
+        String stopReason,
+        SearchFeedback searchFeedback
 ) {
+
+    public SearchTaskMemoryContext(String reportMonth, LocalDate targetStartDate, LocalDate targetEndDate,
+            List<String> keywords, List<String> selectedSources, List<String> executedSources, Counts counts,
+            List<Long> candidatePolicyIds, List<SourceFailure> sourceFailures, int currentRound,
+            List<Integer> completedRounds, List<ExecutedPlan> executedPlans, List<TopicCoverage> topicCoverage,
+            int consecutiveNoGrowthRounds, String stopReason) {
+        this(reportMonth, targetStartDate, targetEndDate, keywords, selectedSources, executedSources, counts,
+                candidatePolicyIds, sourceFailures, currentRound, completedRounds, executedPlans, topicCoverage,
+                consecutiveNoGrowthRounds, stopReason, null);
+    }
+
+    public SearchTaskMemoryContext withFeedback(SearchFeedback feedback) {
+        return new SearchTaskMemoryContext(reportMonth, targetStartDate, targetEndDate, keywords,
+                selectedSources, executedSources, counts, candidatePolicyIds, sourceFailures, currentRound,
+                completedRounds, executedPlans, topicCoverage, consecutiveNoGrowthRounds, stopReason, feedback);
+    }
 
     public record Counts(int found, int saved, int duplicate, int filtered, int failed) {
         public static Counts of(int found, int saved, int duplicate, int filtered, int failed) {

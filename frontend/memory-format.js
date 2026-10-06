@@ -19,6 +19,7 @@
         ROUND_PLANNED: '本轮计划生成',
         ROUND_STARTED: '本轮搜索开始',
         COVERAGE_EVALUATED: '主题覆盖度评估',
+        SEARCH_FEEDBACK_EVALUATED: '材料缺口与术语反馈',
         ROUND_COMPLETED: '本轮搜索完成',
         TASK_COMPLETED: '任务完成',
         TASK_FAILED: '任务失败'
@@ -100,6 +101,16 @@
     function summarizeEventOutput(eventType, json) {
         var obj = safeParseJson(json);
         if (!obj) return null;
+        if (eventType === 'SEARCH_FEEDBACK_EVALUATED') {
+            var gaps = (obj.coverage || []).filter(function (c) { return c.status !== 'COVERED'; })
+                .map(function (c) { return c.topic; });
+            var a = obj.materialAssessment;
+            if (a && Array.isArray(a.validationIssues) && a.validationIssues.length === 0) gaps = a.missingTopics || [];
+            var terms = (obj.terms || []).map(function (t) { return t.term; });
+            var assessment = summarizeAssessment(obj);
+            return (assessment ? assessment + ' · ' : '') + '待补主题：' + (gaps.join('、') || '暂无') + ' · 原文术语：' +
+                (terms.join('、') || '暂无') + ' · ' + (obj.note || '');
+        }
         if (eventType === 'SOURCE_FAILED' || eventType === 'TASK_FAILED') {
             return '错误：' + (obj.error || '未记录');
         }
@@ -109,6 +120,15 @@
                 ' · 失败 ' + num(obj.failed);
         }
         return null;
+    }
+
+    function summarizeAssessment(feedback) {
+        var a = feedback && feedback.materialAssessment;
+        if (!a) return '';
+        var issues = Array.isArray(a.validationIssues) ? a.validationIssues : ['缺少校验记录'];
+        if (issues.length) return '充分性评估未采纳：' + issues.join('；');
+        var verdict = a.materialSufficient === true ? '材料充分' : a.materialSufficient === false ? '仍需补充' : '暂无法判断';
+        return '模型判断：' + verdict + (a.reason ? '；' + a.reason : '');
     }
 
     return {
@@ -121,6 +141,7 @@
         fmtDateTime: fmtDateTime,
         num: num,
         summarizeEventInput: summarizeEventInput,
-        summarizeEventOutput: summarizeEventOutput
+        summarizeEventOutput: summarizeEventOutput,
+        summarizeAssessment: summarizeAssessment
     };
 }));

@@ -61,6 +61,9 @@ public class PolicyAnalysis {
     @Column(name = "evidence_json", columnDefinition = "TEXT")
     private String evidenceJson;
 
+    @Column(name = "quality_report_json", columnDefinition = "TEXT")
+    private String qualityReportJson;
+
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
 
